@@ -47,3 +47,20 @@ jobs:
         run: npm run typecheck
       - name: Unit tests (without local browser/real PostgreSQL)
         run: npm test
+
+  browser-policy:
+    name: Chromium worker policy (no browser needed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: browser-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check worker syntax
+        run: node --check src/server.mjs && node --check src/policy.mjs
+      - name: Test agent domain and ownership policies
+        run: npm test
