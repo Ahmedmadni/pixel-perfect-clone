@@ -46,7 +46,7 @@ This creates a gitignored `runtime/.env` and prints a one-time 64-character toke
 - Keep `OLLAMA_URL=http://127.0.0.1:11434`. Only loopback HTTP origins are accepted.
 - Never commit `.env`, send your token in chat, or expose PostgreSQL to the internet.
 
-Run PostgreSQL migrations 001–004 (including read-only task history) and start the runtime:
+Run PostgreSQL migrations 001–005 (including task history and internal notifications) and start the runtime:
 
 ```powershell
 npm run migrate
