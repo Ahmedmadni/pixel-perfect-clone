@@ -51,6 +51,21 @@ POST /v1/chat/stream uses a validated *installed* model and streams newline-deli
 
 On error it emits `{"type":"error","error":"..."}` when the connection remains writable and records the failed/aborted assistant row. Aborting the client's fetch aborts the upstream Ollama generation. Chat messages are stored in the local `chat_messages` PostgreSQL table (migration 002). Chat history in real mode no longer uses mock responses.
 
+## Phase 2D knowledge — code present, local database tests pending
+
+All endpoints require the local bearer token and PostgreSQL migration `003_knowledge.sql`.
+Mock mode retains separate localStorage demonstration data; these examples are **not** imported automatically.
+
+| Method | Endpoint | Body | Response |
+|---|---|---|---|
+| GET | `/v1/knowledge` | — | Versioned knowledge items |
+| POST | `/v1/knowledge` | `{category,title,body,tags}` | Created item (201) |
+| PUT | `/v1/knowledge/:id` | `{category,title,body,tags,expectedVersion}` | Updated version; stale edits return 409 |
+| POST | `/v1/knowledge/:id/restore` | `{version,expectedVersion}` | Creates new version from an older one |
+| DELETE | `/v1/knowledge/:id` | — | Hard deletion of item and versions |
+
+Database changes use transactions, row locking and audit entries recording item IDs but not personal text. No private information is seeded. This implements permanent storage, **not yet relevant-memory retrieval by the AI agent**.
+
 ## Phase 2C browser integration — code present, local verification pending
 
 Fastify never exposes the browser worker secret to the browser UI. If
@@ -77,7 +92,6 @@ All POST tab operations require confirmed `MANUAL` control in PostgreSQL and wor
 | GET | `/v1/schedules` | Background task scheduler |
 | GET | `/v1/approvals` | Pending approval records |
 | POST | `/v1/approvals/:id` | Approve/reject a specific queued action |
-| GET/POST/PUT/DELETE | `/v1/knowledge` | Persistent versioned knowledge center |
 
 The current frontend renders these sections in mock mode; in real mode, unsupported routes should show clear errors, not fallback sample data.
 
