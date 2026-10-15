@@ -16,11 +16,11 @@ import type {
   ScheduledTask,
 } from "./types";
 
-export const API_BASE: string = import.meta.env.VITE_LOCAL_API_URL ?? "http://127.0.0.1:4100";
+export const API_BASE: string = import.meta.env["VITE_LOCAL_API_URL"] ?? "http://127.0.0.1:4100";
 export const NOVNC_URL: string =
-  import.meta.env.VITE_NOVNC_URL ?? "http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale";
+  import.meta.env["VITE_NOVNC_URL"] ?? "http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale";
 /** Mock mode is ON unless explicitly disabled with VITE_MOCK_MODE=false. */
-export const MOCK_MODE: boolean = import.meta.env.VITE_MOCK_MODE !== "false";
+export const MOCK_MODE: boolean = import.meta.env["VITE_MOCK_MODE"] !== "false";
 
 export class ApiError extends Error {
   constructor(

@@ -58,7 +58,7 @@ export function KnowledgeManager({ categories }: { categories: KnowledgeCategory
             ))}
           </div>
         )}
-        <Button onClick={() => setEditing({ id: null, d: { category: categories[0], title: "", body: "", tags: "" } })}>
+        <Button onClick={() => setEditing({ id: null, d: { category: categories[0] ?? "personal", title: "", body: "", tags: "" } })}>
           <Plus className="size-4" /> إضافة
         </Button>
       </div>

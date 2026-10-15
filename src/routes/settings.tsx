@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { API_BASE, MOCK_MODE, NOVNC_URL } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
@@ -10,7 +11,7 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
-function Row({ k, v }: { k: string; v: React.ReactNode }) {
+function Row({ k, v }: { k: string; v: ReactNode }) {
   return (
     <div className="flex items-center justify-between border-b py-3 text-sm last:border-0">
       <span className="text-muted-foreground">{k}</span>
