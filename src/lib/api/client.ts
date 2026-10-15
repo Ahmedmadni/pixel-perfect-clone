@@ -12,6 +12,7 @@ import type {
   BrowserAccount,
   BrowserTab,
   ChatMessage,
+  KnowledgeItem,
   HealthResponse,
   ScheduledTask,
 } from "./types";
@@ -97,6 +98,15 @@ export const api = {
     request<{ ok: true }>(`/v1/approvals/${id}`, post({ decision }), () => ({
       ok: true as const,
     })),
+  knowledge: () => request<KnowledgeItem[]>("/v1/knowledge"),
+  knowledgeCreate: (draft: Pick<KnowledgeItem, "category" | "title" | "body" | "tags">) =>
+    request<KnowledgeItem>("/v1/knowledge", post(draft)),
+  knowledgeUpdate: (id: string, draft: Pick<KnowledgeItem, "category" | "title" | "body" | "tags">, expectedVersion: number) =>
+    request<KnowledgeItem>(`/v1/knowledge/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ ...draft, expectedVersion }) }),
+  knowledgeRestore: (id: string, version: number, expectedVersion: number) =>
+    request<KnowledgeItem>(`/v1/knowledge/${encodeURIComponent(id)}/restore`, post({version, expectedVersion})),
+  knowledgeDelete: (id: string) =>
+    request<{ok: true}>(`/v1/knowledge/${encodeURIComponent(id)}`, { method: "DELETE" }),
   logs: () => request<ActivityLog[]>("/v1/logs", undefined, mock.logs),
 };
 
