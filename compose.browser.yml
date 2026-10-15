@@ -1,0 +1,23 @@
+# Start ONLY after creating browser-worker/.env with strong secrets.
+# Host ports intentionally bind to 127.0.0.1. Do not make public.
+services:
+  browser-worker:
+    build:
+      context: ./browser-worker
+    env_file:
+      - ./browser-worker/.env
+    ports:
+      - "127.0.0.1:4300:4300"
+      - "127.0.0.1:6080:6080"
+    volumes:
+      - paw_browser_profiles:/home/pwuser/browser-data
+    shm_size: "1gb"
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  paw_browser_profiles:
