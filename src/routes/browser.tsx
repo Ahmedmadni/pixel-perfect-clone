@@ -8,6 +8,7 @@ import { canSend } from "@/lib/control-machine";
 import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { BrowserTabAction } from "@/lib/api/types";
 import { ControlBadge, PageHeader, Panel, Pill, QueryState, fmtTime } from "@/components/workspace/ui-bits";
 
@@ -21,6 +22,24 @@ function BrowserPage() {
   const qc = useQueryClient();
   const health = useQuery({ queryKey: ["health"], queryFn: api.health, retry: 0, refetchInterval: 10000 });
   const tabs = useQuery({ queryKey: ["tabs"], queryFn: api.browserTabs, retry: 0, refetchInterval: 5000 });
+  const models = useQuery({ queryKey: ["models"], queryFn: api.models, retry: 0, refetchInterval: 30000 });
+  const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks, retry: 0, refetchInterval: 3000 });
+  const [objective, setObjective] = useState("");
+  const [model, setModel] = useState("");
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const selectedModel = models.data?.models.some((m) => m.name === model) ? model : models.data?.models[0]?.name ?? "";
+  const activeReview = tasks.data?.find((t) => t.status === "queued" || t.status === "running");
+  const latestReview = tasks.data?.find((t) => t.result || t.error);
+  const runReview = useMutation({
+    mutationFn: () => api.startReview(objective.trim(), selectedTabId ?? "", selectedModel),
+    onSuccess: () => { setReviewError(null); void qc.invalidateQueries({ queryKey: ["tasks"] }); void qc.invalidateQueries({ queryKey: ["agentStatus"] }); },
+    onError: (e: Error) => setReviewError(e.message),
+  });
+  const cancelReview = useMutation({
+    mutationFn: (id: string) => api.cancelReview(id),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["tasks"] }); },
+    onError: (e: Error) => setReviewError(e.message),
+  });
   const [address, setAddress] = useState("");
   const [tabError, setTabError] = useState<string | null>(null);
   const tabOperation = useMutation({
@@ -37,6 +56,7 @@ function BrowserPage() {
   const mayEditTabs = !MOCK_MODE && connected && !pending && !tabOperation.isPending && s === "MANUAL" && browserReady;
   const selectedTabId = tabs.data?.find((t) => t.active)?.id ?? tabs.data?.[0]?.id;
   const canConnect = !MOCK_MODE && connected && noVncReady;
+  const mayReview = !MOCK_MODE && connected && !pending && s === "MANUAL" && noVncReady && browserReady && agentReady && Boolean(selectedTabId) && Boolean(selectedModel) && !activeReview && !runReview.isPending && objective.trim().length >= 4;
   const viewOnly = !connected || pending || s !== "MANUAL";
   const viewerUrl = new URL(NOVNC_URL);
   if (viewOnly) viewerUrl.searchParams.set("view_only", "1");
@@ -49,7 +69,7 @@ function BrowserPage() {
         desc="عرض متصفح Chromium الحقيقي على جهازك عبر noVNC. لا يتم تضمين المواقع عبر iframe عادي."
         actions={
           <>
-            <Button size="sm" disabled={!mayAct || (!MOCK_MODE && (!noVncReady || !browserReady || !agentReady)) || !canSend(s, "START_AGENT")} onClick={() => send({ type: "START_AGENT" })}><Play className="size-4" /> تسليم للوكيل</Button>
+            <Button size="sm" disabled={!MOCK_MODE || !canSend(s, "START_AGENT")} onClick={() => send({ type: "START_AGENT" })}><Play className="size-4" /> {MOCK_MODE ? "محاكاة تسليم" : "ابدأ مهمة مراجعة أدناه"}</Button>
             <Button size="sm" variant="secondary" disabled={!mayAct || !canSend(s, "TAKE_OVER")} onClick={() => send({ type: "TAKE_OVER" })}><Hand className="size-4" /> استلام يدوي</Button>
             <Button size="sm" variant="secondary" disabled={!mayAct || (!canSend(s, "PAUSE") && !canSend(s, "RESUME"))} onClick={() => send({ type: s === "PAUSED" ? "RESUME" : "PAUSE" })}><Pause className="size-4" /> {s === "PAUSED" ? "استئناف" : "إيقاف مؤقت"}</Button>
             <Button size="sm" variant="outline" disabled={!mayAct || !canSend(s, "RESET")} onClick={() => send({ type: "RESET" })}><RotateCcw className="size-4" /> إعادة ضبط</Button>
@@ -118,6 +138,36 @@ function BrowserPage() {
                 محاكاة طلب موافقة
               </Button>
             )}
+          </Panel>
+          <Panel title="مراجعة صفحة بالذكاء الاصطناعي (قراءة فقط)">
+            <p className="mb-3 text-xs text-muted-foreground">افتح الموقع وسجّل الدخول بنفسك. حدد المهمة وسنراجع فقط التبويب النشط المصرح به؛ لن تُرسل أي رسالة أو تعليق أو تعديل.</p>
+            <div className="space-y-2">
+              <label htmlFor="agent-review-model" className="block text-xs">نموذج Ollama</label>
+              <select id="agent-review-model" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={selectedModel} onChange={(e) => setModel(e.target.value)} disabled={!!activeReview || models.isPending || !!models.error}>
+                {!selectedModel && <option value="">لا يوجد نموذج محلي</option>}
+                {models.data?.models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
+              </select>
+              <label htmlFor="agent-review-objective" className="block text-xs">تعليمات المهمة</label>
+              <Textarea id="agent-review-objective" rows={3} value={objective} onChange={(e) => setObjective(e.target.value)} disabled={!!activeReview} placeholder="راجع التعليقات الظاهرة على الصفحة واقترح ردودًا مناسبة لأسلوبي دون نشرها" />
+              <Button className="w-full" disabled={!mayReview} onClick={() => runReview.mutate()}>بدء المراجعة الآمنة</Button>
+              {activeReview && (
+                <div className="space-y-2 rounded-md border bg-muted/30 p-2 text-xs">
+                  <p>مهمة قيد التشغيل: {activeReview.title}</p>
+                  <Button size="sm" variant="destructive" disabled={cancelReview.isPending} onClick={() => cancelReview.mutate(activeReview.id)}>إلغاء المهمة</Button>
+                </div>
+              )}
+              {latestReview && (
+                <div className="max-h-64 space-y-2 overflow-y-auto rounded-md border p-2 text-xs">
+                  <p className="font-medium">آخر تقرير: {latestReview.status === "done" ? "مكتمل" : latestReview.status === "cancelled" ? "ملغى" : "لم يكتمل"}</p>
+                  {latestReview.result && <p className="whitespace-pre-wrap">{latestReview.result}</p>}
+                  {latestReview.error && <p className="text-destructive">{latestReview.error}</p>}
+                  {latestReview.steps?.map((step, i) => <p key={i} className="text-muted-foreground">{step.phase}: {step.detail}</p>)}
+                </div>
+              )}
+              {reviewError && <p role="alert" className="text-xs text-destructive">{reviewError}</p>}
+              {!MOCK_MODE && !agentReady && <p className="text-xs text-muted-foreground">الوكيل غير مفعّل حتى يتوفر Ollama والمتصفح ويُصرّح له بالنطاقات من إعدادات التشغيل المحلية.</p>}
+              {MOCK_MODE && <Pill tone="warning">هذه الواجهة تجريبية؛ المهام الحقيقية متوقفة</Pill>}
+            </div>
           </Panel>
           <Panel title="سجل الانتقالات">
             {snap.history.length === 0 ? (
