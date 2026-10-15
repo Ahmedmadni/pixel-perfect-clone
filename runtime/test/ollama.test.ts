@@ -5,7 +5,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("Ollama local client", () => {
   it("discovers installed model names from the native tags endpoint", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+    const fetchMock = vi.fn(async (_input: unknown) => new Response(JSON.stringify({
       models: [{ name: "local-test:latest", size: 1024, details: { family: "llama", parameter_size: "1B" } }],
     }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
