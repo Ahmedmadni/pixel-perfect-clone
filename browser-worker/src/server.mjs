@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { connect } from "node:net";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { chromium } from "playwright";
@@ -153,12 +154,23 @@ async function operation(data, actor, action) {
   throw new Error("unsupported_operation");
 }
 
+async function isNoVncListening() {
+  return await new Promise((resolve) => {
+    const socket = connect({host: "127.0.0.1", port: 6080});
+    const finish = (ready) => { socket.destroy(); resolve(ready); };
+    socket.setTimeout(1500);
+    socket.once("connect", () => finish(true));
+    socket.once("error", () => finish(false));
+    socket.once("timeout", () => finish(false));
+  });
+}
+
 async function handle(req, res) {
   // This worker is a private BACKEND-TO-BACKEND service, never a browser-facing API.
   if (req.headers.origin) return json(res, 403, { error: "origin_forbidden" });
   if (!requireToken(req.headers.authorization)) return json(res, 401, { error: "unauthorized" });
   const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
-  if (req.method === "GET" && pathname === "/health") return json(res, 200, browserHealth());
+  if (req.method === "GET" && pathname === "/health") return json(res, 200, {...browserHealth(), novnc: await isNoVncListening()});
   if (req.method === "GET" && pathname === "/tabs") return json(res, 200, await tabStates());
 
   if (req.method !== "POST") return json(res, 404, { error: "unknown_route" });
