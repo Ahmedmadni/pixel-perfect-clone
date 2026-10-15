@@ -50,12 +50,20 @@ export interface ChatMessage {
   error?: string | null;
 }
 
-export type TaskStatus = "queued" | "running" | "awaiting_approval" | "done" | "failed";
+export type TaskStatus = "queued" | "running" | "awaiting_approval" | "done" | "failed" | "cancelled";
 export interface AgentTask {
   id: string;
   title: string;
   status: TaskStatus;
   createdAt: string;
+  // Only present for actual Phase 2E read-only review tasks.
+  objective?: string;
+  model?: string;
+  tabId?: string;
+  result?: string | null;
+  error?: string | null;
+  steps?: { at: string; phase: string; detail: string }[];
+  finishedAt?: string | null;
 }
 
 export type KnowledgeCategory = "personal" | "instruction" | "style" | "example";
