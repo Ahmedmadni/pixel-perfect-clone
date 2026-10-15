@@ -31,11 +31,17 @@ export interface BrowserTab {
   active: boolean;
 }
 
+export type ChatMessageStatus = "complete" | "streaming" | "aborted" | "failed";
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   at: string;
+  /** Present on runtime-persisted messages (Phase 2B). */
+  seq?: number;
+  status?: ChatMessageStatus;
+  model?: string | null;
+  error?: string | null;
 }
 
 export type TaskStatus = "queued" | "running" | "awaiting_approval" | "done" | "failed";
