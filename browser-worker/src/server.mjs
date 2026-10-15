@@ -11,6 +11,7 @@ const profileDir = process.env.BROWSER_PROFILE_DIR ?? "/home/pwuser/browser-data
 const allowedDomains = (process.env.BROWSER_AGENT_DOMAINS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 const port = Number(process.env.BROWSER_WORKER_PORT ?? "4300");
 const display = process.env.DISPLAY ?? ":99";
+const enableReadOnlyAgent = process.env.BROWSER_ENABLE_READONLY_AGENT === "true";
 let mode = "STOPPED"; // Fail-closed on every start/restart.
 let generation = 0;
 let context;
@@ -89,7 +90,7 @@ async function tabStates() {
 }
 
 function browserHealth() {
-  return { ready: Boolean(context), mode, viewOnly: mode !== "MANUAL", tabs: context ? pages().length : 0, agentRunnerReady: false };
+  return { ready: Boolean(context), mode, viewOnly: mode !== "MANUAL", tabs: context ? pages().length : 0, agentRunnerReady: enableReadOnlyAgent && Boolean(context) && allowedDomains.length > 0 };
 }
 
 async function setMode(target) {
@@ -112,6 +113,7 @@ async function setMode(target) {
 
 async function operation(data, actor, action) {
   if (!canOperate(mode, actor, action)) throw new Error("control_not_owned");
+  if (actor === "agent" && !enableReadOnlyAgent) throw new Error("agent_disabled");
   const generationAtStart = generation;
   const page = data.tabId ? findPage(data.tabId) : pages().at(-1);
   if (!page && action !== "new") throw new Error("no_tab");
@@ -160,6 +162,8 @@ async function operation(data, actor, action) {
     }
   }
   if (action === "inspect") {
+    // Do not inspect login/account pages without explicit domain allowlist.
+    validateBrowserUrl(page.url(), true, allowedDomains);
     const title = await page.title();
     const text = (await page.locator("body").innerText({ timeout: 5000 }).catch(() => "")).slice(0, 12000);
     if (generationAtStart !== generation) throw new Error("ownership_changed");
@@ -191,6 +195,7 @@ async function handle(req, res) {
   if (req.method !== "POST") return json(res, 404, { error: "unknown_route" });
   const data = await bodyJson(req);
   if (pathname === "/control") {
+    if (data.state === "AGENT_ACTIVE" && !enableReadOnlyAgent) return json(res, 409, { error: "agent_disabled" });
     if (typeof data.state !== "string") return json(res, 400, { error: "invalid_control" });
     // For STOP, apply immediately; don't wait for a pending read-only agent task.
     return json(res, 200, await setMode(data.state));
@@ -213,7 +218,7 @@ async function handle(req, res) {
 const server = createServer((req, res) => {
   void handle(req, res).catch((e) => {
     const error = String(e?.message ?? "worker_error");
-    const denied = /^(control_not_owned|invalid_handoff|agent_domain_not_approved|agent_requires_https|ownership_changed)$/.test(error);
+    const denied = /^(control_not_owned|invalid_handoff|agent_disabled|agent_domain_not_approved|agent_requires_https|ownership_changed)$/.test(error);
     const invalid = /^(invalid_url|bad_json|body_too_large|unknown_tab|no_tab|last_tab_cannot_close)$/.test(error);
     json(res, denied ? 409 : invalid ? 400 : 503, { error: denied || invalid ? error : "browser_worker_unavailable" });
   });
