@@ -15,6 +15,7 @@ import type {
   HealthResponse,
   ScheduledTask,
 } from "./types";
+import type { ControlEvent, ControlSnapshot } from "../control-machine";
 
 export const API_BASE: string = import.meta.env["VITE_LOCAL_API_URL"] ?? "http://127.0.0.1:4100";
 export const NOVNC_URL: string =
@@ -32,9 +33,16 @@ export class ApiError extends Error {
   }
 }
 
-function getToken() {
+export function getLocalToken() {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("paw.token");
+  return window.sessionStorage.getItem("paw.token");
+}
+
+/** Session-only storage: closing this browser session clears the local API secret. */
+export function setLocalToken(value: string) {
+  if (typeof window === "undefined") return;
+  if (value.trim()) window.sessionStorage.setItem("paw.token", value.trim());
+  else window.sessionStorage.removeItem("paw.token");
 }
 
 async function request<T>(path: string, init?: RequestInit, mockFn?: () => T): Promise<T> {
@@ -46,7 +54,7 @@ async function request<T>(path: string, init?: RequestInit, mockFn?: () => T): P
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const token = getToken();
+    const token = getLocalToken();
     const res = await fetch(`${API_BASE}${path}`, {
       ...init,
       signal: ctrl.signal,
@@ -73,8 +81,8 @@ const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.strin
 export const api = {
   health: () => request<HealthResponse>("/v1/health", undefined, mock.health),
   agentStatus: () => request<AgentStatus>("/v1/agent/status", undefined, mock.agentStatus),
-  sendControl: (event: string) =>
-    request<{ ok: true }>("/v1/agent/control", post({ event }), () => ({ ok: true as const })),
+  sendControl: (event: ControlEvent) =>
+    request<{ ok: true; snapshot?: ControlSnapshot }>("/v1/agent/control", post(event), () => ({ ok: true as const })),
   browserTabs: () => request<BrowserTab[]>("/v1/browser/tabs", undefined, mock.tabs),
   chatHistory: () => request<ChatMessage[]>("/v1/chat/messages", undefined, mock.chat),
   sendChat: (content: string) =>
