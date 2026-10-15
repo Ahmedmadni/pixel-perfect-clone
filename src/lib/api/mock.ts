@@ -23,6 +23,7 @@ export const mock = {
       { name: "ollama", status: "unknown" },
       { name: "playwright", status: "unknown" },
       { name: "novnc", status: "unknown" },
+      { name: "agent", status: "unknown" },
     ],
   }),
   agentStatus: (): AgentStatus => ({
