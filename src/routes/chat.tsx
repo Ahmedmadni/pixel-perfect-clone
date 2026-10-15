@@ -20,6 +20,7 @@ const taskMeta: Record<TaskStatus, { l: string; t: Tone }> = {
   awaiting_approval: { l: "بانتظار موافقة", t: "warning" },
   done: { l: "مكتملة", t: "success" },
   failed: { l: "فشلت", t: "danger" },
+  cancelled: { l: "أُلغيت", t: "neutral" },
 };
 
 function ChatPage() {
