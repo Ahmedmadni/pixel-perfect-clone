@@ -4,7 +4,7 @@ import type { ControlSnapshot, ControlState } from "../control-machine";
 export type ConnectionStatus = "mock" | "connecting" | "online" | "offline" | "error";
 
 export interface ServiceHealth {
-  name: "api" | "postgres" | "ollama" | "playwright" | "novnc";
+  name: "api" | "postgres" | "ollama" | "playwright" | "novnc" | "agent";
   status: "up" | "down" | "unknown";
   detail?: string;
 }
