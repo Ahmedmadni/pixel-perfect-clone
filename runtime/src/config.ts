@@ -12,6 +12,13 @@ const schema = z.object({
     .string()
     .min(32, "RUNTIME_TOKEN missing or too short — run `npm run token`"),
   DATABASE_URL: z.string().url(),
+  BROWSER_WORKER_TOKEN: z.string().default(""),
+  BROWSER_WORKER_URL: z.string().url().default("http://127.0.0.1:4300").refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) && !url.username && !url.password && !url.search && !url.hash;
+    } catch { return false; }
+  }, "BROWSER_WORKER_URL must use a localhost HTTP origin"),
   OLLAMA_URL: z.string().url().default("http://127.0.0.1:11434").refine((value) => {
     try {
       const url = new URL(value);
