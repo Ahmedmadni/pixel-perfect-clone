@@ -11,8 +11,10 @@ import { registerChatRoutes } from "./chat-routes.ts";
 import { BrowserGateway } from "./browser-gateway.ts";
 import { nextState, type ControlEvent } from "../../src/lib/control-machine.ts";
 import { KnowledgeConflictError, KnowledgeNotFoundError, type PgKnowledgeStore } from "./knowledge-store.ts";
+import type { TaskRepository } from "./task-store.ts";
+import { AgentBusyError, AgentNotReadyError, ReadOnlyAgent } from "./read-only-agent.ts";
 
-export const VERSION = "0.3.0-phase2c-foundation";
+export const VERSION = "0.4.0-phase2e-readonly";
 
 const controlBody = z.discriminatedUnion("type", [
   z.object({ type: z.literal("START_AGENT") }).strict(),
@@ -38,7 +40,7 @@ function tokenOk(header: string | undefined, token: string) {
 export async function buildApp(
   cfg: Pick<Config, "RUNTIME_TOKEN" | "CORS_ORIGINS">,
   store: ControlStore,
-  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway; knowledge?: PgKnowledgeStore },
+  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway; knowledge?: PgKnowledgeStore; tasks?: TaskRepository },
 ): Promise<FastifyInstance> {
   const startedAt = Date.now();
   let controlQueue: Promise<unknown> = Promise.resolve();
@@ -47,6 +49,9 @@ export async function buildApp(
     controlQueue = next.catch(() => {});
     return next;
   }
+  const agent = dependencies?.browser && dependencies.ollama && dependencies.tasks
+    ? new ReadOnlyAgent(store, dependencies.browser, dependencies.ollama, dependencies.tasks, serializeControl)
+    : null;
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
 
   await app.register(cors, {
@@ -68,6 +73,8 @@ export async function buildApp(
   });
 
   app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof AgentBusyError) return reply.code(409).send({ error: "agent_busy", detail: err.message });
+    if (err instanceof AgentNotReadyError) return reply.code(503).send({ error: "agent_not_ready", detail: err.message });
     if (err instanceof KnowledgeNotFoundError) return reply.code(404).send({ error: "knowledge_not_found" });
     if (err instanceof KnowledgeConflictError) return reply.code(409).send({ error: "knowledge_version_conflict" });
     if (err instanceof StoreUnavailableError) {
@@ -108,7 +115,7 @@ export async function buildApp(
         ollamaHealth,
         dependencies?.browser ? { name: "playwright", status: browserHealth?.ready ? "up" : "down" } : { name: "playwright", status: "unknown", detail: notProbed },
         dependencies?.browser ? { name: "novnc", status: browserHealth?.novnc ? "up" : "down" } : { name: "novnc", status: "unknown", detail: notProbed },
-        { name: "agent", status: "unknown", detail: "autonomous browser agent not implemented (Phase 2E)" },
+        { name: "agent", status: agent ? ((browserHealth?.ready && browserHealth.agentRunnerReady && ollamaHealth.status === "up") ? "up" : "down") : "unknown", detail: agent ? "User-started read-only review runner; no posting or messaging" : "Read-only runner not configured" },
       ],
     };
   });
@@ -126,7 +133,7 @@ export async function buildApp(
     }
     return {
       control: snapshot.state,
-      currentTask: null,
+      currentTask: agent?.activeTaskId() ?? null,
       model: null,
       uptimeSec: Math.floor((Date.now() - startedAt) / 1000),
       snapshot,
@@ -141,6 +148,10 @@ export async function buildApp(
       const before = await store.getSnapshot();
       if (!nextState(before.state, event.type)) return { status: 409, body: { error: "invalid_transition", snapshot: before } };
       const agentStarts = ["START_AGENT", "APPROVE", "RESUME"].includes(event.type);
+      if (event.type === "START_AGENT" && agent) {
+        return { status: 409, body: { error: "start_review_task_instead" } };
+      }
+      if (["TAKE_OVER", "PAUSE", "EMERGENCY_STOP", "FAIL", "REJECT"].includes(event.type)) agent?.cancelActive();
       if (agentStarts && !dependencies?.browser && !dependencies?.browserReady?.()) {
         return { status: 503, body: { error: "browser_agent_not_ready" } };
       }
@@ -177,6 +188,42 @@ export async function buildApp(
       }
     });
     return reply.code(result.status).send(result.body);
+  });
+
+  // Phase 2E: user-authorized review of a single browser tab; strictly read-only.
+  const taskBody = z.object({
+    objective: z.string().trim().min(4).max(2000),
+    tabId: z.string().uuid(),
+    model: z.string().trim().min(1).max(200),
+  }).strict();
+  app.get("/v1/tasks", async (req, reply) => {
+    if (!dependencies?.tasks) return reply.code(503).send({ error: "tasks_not_configured" });
+    const query = z.object({limit: z.coerce.number().int().min(1).max(100).default(30)}).strict().safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: "invalid_query" });
+    return dependencies.tasks.list(query.data.limit);
+  });
+  app.post("/v1/tasks", async (req, reply) => {
+    if (!agent) return reply.code(503).send({ error: "agent_not_configured" });
+    const body = taskBody.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: "invalid_review_request" });
+    const task = await serializeControl(() => agent.start(body.data));
+    return reply.code(202).send(task);
+  });
+  app.get("/v1/tasks/:id", async (req, reply) => {
+    if (!dependencies?.tasks) return reply.code(503).send({ error: "tasks_not_configured" });
+    const params = z.object({id: z.string().uuid()}).safeParse(req.params);
+    if (!params.success) return reply.code(400).send({ error: "invalid_task_id" });
+    const task = await dependencies.tasks.get(params.data.id);
+    if (!task) return reply.code(404).send({ error: "task_not_found" });
+    return task;
+  });
+  app.post("/v1/tasks/:id/cancel", async (req, reply) => {
+    if (!agent) return reply.code(503).send({ error: "agent_not_configured" });
+    const params = z.object({id: z.string().uuid()}).safeParse(req.params);
+    if (!params.success) return reply.code(400).send({ error: "invalid_task_id" });
+    const cancelled = agent.cancel(params.data.id);
+    if (!cancelled) return reply.code(409).send({ error: "task_not_active" });
+    return reply.code(202).send({ ok: true, cancelling: true });
   });
 
   app.get("/v1/browser/tabs", async (_req, reply) => {
