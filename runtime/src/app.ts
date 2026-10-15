@@ -10,6 +10,7 @@ import type { ChatStore } from "./chat-store.ts";
 import { registerChatRoutes } from "./chat-routes.ts";
 import { BrowserGateway } from "./browser-gateway.ts";
 import { nextState, type ControlEvent } from "../../src/lib/control-machine.ts";
+import { KnowledgeConflictError, KnowledgeNotFoundError, type PgKnowledgeStore } from "./knowledge-store.ts";
 
 export const VERSION = "0.3.0-phase2c-foundation";
 
@@ -37,7 +38,7 @@ function tokenOk(header: string | undefined, token: string) {
 export async function buildApp(
   cfg: Pick<Config, "RUNTIME_TOKEN" | "CORS_ORIGINS">,
   store: ControlStore,
-  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway },
+  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway; knowledge?: PgKnowledgeStore },
 ): Promise<FastifyInstance> {
   const startedAt = Date.now();
   let controlQueue: Promise<unknown> = Promise.resolve();
@@ -50,7 +51,7 @@ export async function buildApp(
 
   await app.register(cors, {
     origin: (origin, cb) => cb(null, !origin || cfg.CORS_ORIGINS.includes(origin)),
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
 
@@ -67,6 +68,8 @@ export async function buildApp(
   });
 
   app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof KnowledgeNotFoundError) return reply.code(404).send({ error: "knowledge_not_found" });
+    if (err instanceof KnowledgeConflictError) return reply.code(409).send({ error: "knowledge_version_conflict" });
     if (err instanceof StoreUnavailableError) {
       return reply.code(503).send({ error: "store_unavailable", detail: "PostgreSQL unreachable — control is fail-closed" });
     }
@@ -203,6 +206,46 @@ export async function buildApp(
     } catch {
       return reply.code(503).send({ error: "browser_worker_unavailable_or_busy" });
     }
+  });
+
+  // Phase 2D: local-only persistent knowledge and reply styles.
+  const knowledgeDraft = z.object({
+    category: z.enum(["personal", "instruction", "style", "example"]),
+    title: z.string().trim().min(1).max(250),
+    body: z.string().max(12000),
+    tags: z.array(z.string().trim().min(1).max(60)).max(30),
+  }).strict();
+  const uuidParams = z.object({ id: z.string().uuid() });
+  app.get("/v1/knowledge", async (_req, reply) => {
+    if (!dependencies?.knowledge) return reply.code(503).send({ error: "knowledge_store_not_configured" });
+    return dependencies.knowledge.list();
+  });
+  app.post("/v1/knowledge", async (req, reply) => {
+    if (!dependencies?.knowledge) return reply.code(503).send({ error: "knowledge_store_not_configured" });
+    const parsed = knowledgeDraft.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_knowledge" });
+    return reply.code(201).send(await dependencies.knowledge.create(parsed.data));
+  });
+  app.put("/v1/knowledge/:id", async (req, reply) => {
+    if (!dependencies?.knowledge) return reply.code(503).send({ error: "knowledge_store_not_configured" });
+    const params = uuidParams.safeParse(req.params);
+    const body = knowledgeDraft.extend({ expectedVersion: z.number().int().positive() }).safeParse(req.body);
+    if (!params.success || !body.success) return reply.code(400).send({ error: "invalid_knowledge_update" });
+    const { expectedVersion, ...draft } = body.data;
+    return dependencies.knowledge.update(params.data.id, draft, expectedVersion);
+  });
+  app.post("/v1/knowledge/:id/restore", async (req, reply) => {
+    if (!dependencies?.knowledge) return reply.code(503).send({ error: "knowledge_store_not_configured" });
+    const params = uuidParams.safeParse(req.params);
+    const body = z.object({ version: z.number().int().positive(), expectedVersion: z.number().int().positive() }).strict().safeParse(req.body);
+    if (!params.success || !body.success) return reply.code(400).send({ error: "invalid_knowledge_restore" });
+    return dependencies.knowledge.restore(params.data.id, body.data.version, body.data.expectedVersion);
+  });
+  app.delete("/v1/knowledge/:id", async (req, reply) => {
+    if (!dependencies?.knowledge) return reply.code(503).send({ error: "knowledge_store_not_configured" });
+    const params = uuidParams.safeParse(req.params);
+    if (!params.success) return reply.code(400).send({ error: "invalid_knowledge_id" });
+    return dependencies.knowledge.remove(params.data.id);
   });
 
   app.get("/v1/logs", async (req, reply) => {
