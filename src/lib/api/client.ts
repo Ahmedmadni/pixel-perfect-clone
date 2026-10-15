@@ -13,6 +13,7 @@ import type {
   BrowserTab,
   ChatMessage,
   KnowledgeItem,
+  LocalNotification,
   HealthResponse,
   ScheduledTask,
 } from "./types";
@@ -113,6 +114,8 @@ export const api = {
     request<KnowledgeItem>(`/v1/knowledge/${encodeURIComponent(id)}/restore`, post({version, expectedVersion})),
   knowledgeDelete: (id: string) =>
     request<{ok: true}>(`/v1/knowledge/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  notifications: () => request<LocalNotification[]>("/v1/notifications", undefined, () => []),
+  markNotificationRead: (id: string) => request<{ok: true}>(`/v1/notifications/${encodeURIComponent(id)}/read`, post({})),
   logs: () => request<ActivityLog[]>("/v1/logs", undefined, mock.logs),
 };
 
