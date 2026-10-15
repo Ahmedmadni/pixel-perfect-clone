@@ -1,11 +1,15 @@
 /**
- * Knowledge Center store. Phase 1 persists to browser localStorage (local-first,
- * no cloud). Phase 2 swaps this for /v1/knowledge on the local API (same shape).
+ * Phase 2D: real mode uses the authenticated local PostgreSQL API; mock mode
+ * keeps explicitly labelled localStorage demo data. Never mix the two stores.
  */
 import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { api, MOCK_MODE } from "./api/client";
 import type { KnowledgeCategory, KnowledgeItem } from "./api/types";
 
 const KEY = "paw.knowledge.v1";
+type Draft = Pick<KnowledgeItem, "category" | "title" | "body" | "tags">;
 
 function seed(): KnowledgeItem[] {
   const now = new Date().toISOString();
@@ -21,55 +25,88 @@ function seed(): KnowledgeItem[] {
   ];
 }
 
-function load(): KnowledgeItem[] {
+function loadMock(): KnowledgeItem[] {
   try {
     const raw = window.localStorage.getItem(KEY);
     return raw ? (JSON.parse(raw) as KnowledgeItem[]) : seed();
-  } catch {
-    return seed();
-  }
+  } catch { return seed(); }
 }
 
 export function useKnowledge() {
-  const [items, setItems] = useState<KnowledgeItem[] | null>(null);
+  const qc = useQueryClient();
+  const [demo, setDemo] = useState<KnowledgeItem[] | null>(null);
+  const real = useQuery({ queryKey: ["knowledge"], queryFn: api.knowledge, enabled: !MOCK_MODE, retry: 0 });
 
-  useEffect(() => setItems(load()), []);
-  useEffect(() => {
-    if (items) window.localStorage.setItem(KEY, JSON.stringify(items));
-  }, [items]);
+  useEffect(() => { if (MOCK_MODE) setDemo(loadMock()); }, []);
+  useEffect(() => { if (MOCK_MODE && demo) window.localStorage.setItem(KEY, JSON.stringify(demo)); }, [demo]);
 
-  const create = useCallback((d: Pick<KnowledgeItem, "category" | "title" | "body" | "tags">) => {
-    const at = new Date().toISOString();
-    setItems((cur) => [
-      { ...d, id: crypto.randomUUID(), version: 1, updatedAt: at, history: [{ version: 1, title: d.title, body: d.body, at }] },
-      ...(cur ?? []),
-    ]);
-  }, []);
+  const items = MOCK_MODE ? demo : real.data ?? null;
+  const refresh = async () => { await qc.invalidateQueries({ queryKey: ["knowledge"] }); };
+  const run = useCallback(async (fn: () => Promise<unknown>) => {
+    try {
+      await fn();
+      await qc.invalidateQueries({ queryKey: ["knowledge"] });
+      return true;
+    } catch (e) {
+      toast.error("تعذر حفظ المعلومات في قاعدة البيانات المحلية: " + (e instanceof Error ? e.message : "خطأ غير معروف"));
+      await qc.invalidateQueries({ queryKey: ["knowledge"] });
+      return false;
+    }
+  }, [qc]);
 
-  const update = useCallback((id: string, d: Pick<KnowledgeItem, "category" | "title" | "body" | "tags">) => {
-    const at = new Date().toISOString();
-    setItems((cur) =>
-      (cur ?? []).map((it) => {
+  const create = useCallback(async (d: Draft): Promise<boolean> => {
+    if (MOCK_MODE) {
+      const at = new Date().toISOString();
+      setDemo((cur) => [
+        { ...d, id: crypto.randomUUID(), version: 1, updatedAt: at, history: [{ version: 1, title: d.title, body: d.body, at }] },
+        ...(cur ?? []),
+      ]);
+      return true;
+    }
+    return run(() => api.knowledgeCreate(d));
+  }, [run]);
+
+  const update = useCallback(async (id: string, d: Draft): Promise<boolean> => {
+    if (MOCK_MODE) {
+      const at = new Date().toISOString();
+      setDemo((cur) => (cur ?? []).map((it) => {
         if (it.id !== id) return it;
         const version = it.version + 1;
         return { ...it, ...d, version, updatedAt: at, history: [{ version, title: d.title, body: d.body, at }, ...it.history] };
-      }),
-    );
-  }, []);
+      }));
+      return true;
+    }
+    const prior = real.data?.find((it) => it.id === id);
+    if (!prior) return false;
+    return run(() => api.knowledgeUpdate(id, d, prior.version));
+  }, [real.data, run]);
 
-  const restore = useCallback((id: string, version: number) => {
-    setItems((cur) =>
-      (cur ?? []).map((it) => {
+  const restore = useCallback(async (id: string, version: number): Promise<boolean> => {
+    if (MOCK_MODE) {
+      setDemo((cur) => (cur ?? []).map((it) => {
+        if (it.id !== id) return it;
         const v = it.history.find((h) => h.version === version);
-        if (it.id !== id || !v) return it;
+        if (!v) return it;
         const nv = it.version + 1;
         const at = new Date().toISOString();
-        return { ...it, title: v.title, body: v.body, version: nv, updatedAt: at, history: [{ version: nv, title: v.title, body: v.body, at }, ...it.history] };
-      }),
-    );
-  }, []);
+        return { ...it, title: v.title, body: v.body, version: nv, updatedAt: at,
+          history: [{ version: nv, title: v.title, body: v.body, at }, ...it.history] };
+      }));
+      return true;
+    }
+    const prior = real.data?.find((it) => it.id === id);
+    if (!prior) return false;
+    return run(() => api.knowledgeRestore(id, version, prior.version));
+  }, [real.data, run]);
 
-  const remove = useCallback((id: string) => setItems((cur) => (cur ?? []).filter((i) => i.id !== id)), []);
+  const remove = useCallback(async (id: string): Promise<boolean> => {
+    if (MOCK_MODE) { setDemo((cur) => (cur ?? []).filter((it) => it.id !== id)); return true; }
+    return run(() => api.knowledgeDelete(id));
+  }, [run]);
 
-  return { items, create, update, restore, remove };
+  return {
+    items, create, update, restore, remove, refresh,
+    error: !MOCK_MODE ? real.error : null,
+    loading: !MOCK_MODE ? real.isPending : items === null,
+  };
 }
