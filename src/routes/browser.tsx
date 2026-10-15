@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Hand, Monitor, Pause, Play, RotateCcw, ShieldAlert } from "lucide-react";
+import { Hand, Monitor, Pause, Play, RotateCcw, ShieldAlert, Plus, X } from "lucide-react";
 import { api, MOCK_MODE, NOVNC_URL } from "@/lib/api/client";
 import { useControl } from "@/lib/control-context";
 import { canSend } from "@/lib/control-machine";
 import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import type { BrowserTabAction } from "@/lib/api/types";
 import { ControlBadge, PageHeader, Panel, Pill, QueryState, fmtTime } from "@/components/workspace/ui-bits";
 
 export const Route = createFileRoute("/browser")({
@@ -16,13 +18,23 @@ export const Route = createFileRoute("/browser")({
 
 function BrowserPage() {
   const { snap, send, connected, pending } = useControl();
+  const qc = useQueryClient();
   const health = useQuery({ queryKey: ["health"], queryFn: api.health, retry: 0, refetchInterval: 10000 });
-  const tabs = useQuery({ queryKey: ["tabs"], queryFn: api.browserTabs });
+  const tabs = useQuery({ queryKey: ["tabs"], queryFn: api.browserTabs, retry: 0, refetchInterval: 5000 });
+  const [address, setAddress] = useState("");
+  const [tabError, setTabError] = useState<string | null>(null);
+  const tabOperation = useMutation({
+    mutationFn: (action: BrowserTabAction) => api.browserAction(action),
+    onSuccess: () => { setTabError(null); void qc.invalidateQueries({ queryKey: ["tabs"] }); },
+    onError: (e: Error) => setTabError(e.message),
+  });
   const [connect, setConnect] = useState(false);
   const s = snap.state;
   const noVncReady = health.data?.services.some((x) => x.name === "novnc" && x.status === "up") ?? false;
   const agentReady = health.data?.services.some((x) => x.name === "playwright" && x.status === "up") ?? false;
   const mayAct = MOCK_MODE || (connected && !pending);
+  const mayEditTabs = !MOCK_MODE && connected && !pending && !tabOperation.isPending && s === "MANUAL" && agentReady;
+  const selectedTabId = tabs.data?.find((t) => t.active)?.id ?? tabs.data?.[0]?.id;
   const canConnect = !MOCK_MODE && connected && noVncReady;
   const viewOnly = !connected || pending || s !== "MANUAL";
   const viewerUrl = new URL(NOVNC_URL);
@@ -48,12 +60,22 @@ function BrowserPage() {
           <div className="flex items-center gap-1 border-b bg-muted/50 px-2 pt-2">
             <QueryState q={tabs} empty="لا توجد تبويبات">
               {(ts) => ts.map((t) => (
-                <div key={t.id} className={`rounded-t-md border border-b-0 px-3 py-1.5 text-xs ${t.active ? "bg-card" : "border-transparent text-muted-foreground"}`}>
-                  {t.title} <span className="font-mono opacity-50">· {t.profileId}</span>
+                <div key={t.id} className={`flex items-center gap-1 rounded-t-md border border-b-0 px-2 py-1.5 text-xs ${t.active ? "bg-card" : "border-transparent text-muted-foreground"}`}>
+                  <button type="button" disabled={!mayEditTabs} onClick={() => tabOperation.mutate({ action: "activate", tabId: t.id })} title={t.url} className="max-w-40 truncate">{t.title}</button>
+                  <button type="button" disabled={!mayEditTabs || ts.length <= 1} onClick={() => tabOperation.mutate({ action: "close", tabId: t.id })} title="إغلاق التبويب"><X className="size-3" /></button>
                 </div>
               ))}
             </QueryState>
+            <button type="button" disabled={!mayEditTabs} title="تبويب جديد" onClick={() => tabOperation.mutate({ action: "new" })} className="rounded-md p-2 hover:bg-muted disabled:opacity-40"><Plus className="size-4" /></button>
           </div>
+          <form className="flex gap-2 border-b p-2" onSubmit={(e) => {
+            e.preventDefault();
+            if (mayEditTabs && selectedTabId && address.trim()) tabOperation.mutate({ action: "navigate", tabId: selectedTabId, url: address.trim() });
+          }}>
+            <Input dir="ltr" aria-label="عنوان الموقع" type="url" placeholder="https://example.com" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!mayEditTabs} />
+            <Button size="sm" type="submit" disabled={!mayEditTabs || !selectedTabId || !address.trim()}>انتقال</Button>
+          </form>
+          {tabError && <p role="alert" className="px-3 py-2 text-xs text-destructive">تعذر تنفيذ العملية: {tabError}</p>}
           <div className="relative aspect-video bg-sidebar">
             {connect && canConnect ? (
               <div className="relative size-full">
