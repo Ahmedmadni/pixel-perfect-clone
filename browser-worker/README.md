@@ -40,7 +40,7 @@ All requests require `Authorization: Bearer <BROWSER_WORKER_TOKEN>`. Requests wi
 
 At this milestone the worker **cannot post, reply, send messages, delete, or upload** to external websites. No account permissions are automatically granted. Page text from `/agent/inspect` is untrusted input, not AI instructions.
 
-**Pending before production:** runtime-to-worker gateway/authoritative handoff, end-to-end browser tests on Windows, durable per-account profiles with permission policies, hardened seccomp profile/browser isolation, failure recovery, HTTPS/auth access boundary to noVNC if remote access is ever introduced. Never publish ports to 0.0.0.0 or use the VNC session from Lovable's cloud preview.
+**Pending before production:** end-to-end browser tests on Windows, proof of safe runtime-to-worker handoff, durable per-account profiles with permission policies, hardened seccomp profile/browser isolation, failure recovery, HTTPS/auth access boundary to noVNC if remote access is ever introduced. Never publish ports to 0.0.0.0 or use the VNC session from Lovable's cloud preview.
 
 ## Unit tests
 
