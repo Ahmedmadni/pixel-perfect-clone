@@ -51,6 +51,36 @@ POST /v1/chat/stream uses a validated *installed* model and streams newline-deli
 
 On error it emits `{"type":"error","error":"..."}` when the connection remains writable and records the failed/aborted assistant row. Aborting the client's fetch aborts the upstream Ollama generation. Chat messages are stored in the local `chat_messages` PostgreSQL table (migration 002). Chat history in real mode no longer uses mock responses.
 
+## Phase 2E: supervised read-only page-review tasks (code complete, execution pending)
+
+The user selects an already open approved HTTPS tab and installed local Ollama model.
+The service obtains exclusive agent browser ownership, inspects only that tab,
+generates an Arabic summary/draft suggestions and stores execution steps in
+PostgreSQL migration `004_agent_tasks.sql`. It then returns control to MANUAL.
+
+All routes require local runtime bearer authentication.
+
+| Method | Endpoint | Request | Result |
+|---|---|---|---|
+| GET | `/v1/tasks?limit=30` | — | Latest task records, steps, report and status |
+| POST | `/v1/tasks` | `{"objective":"Review visible comments without posting","tabId":"UUID","model":"installed-model"}` | 202 Accepted with durable queued task |
+| GET | `/v1/tasks/:id` | — | Persisted task detail |
+| POST | `/v1/tasks/:id/cancel` | `{}` | 202 cancellation requested |
+
+Read-only agent is explicitly disabled unless both `BROWSER_ENABLE_READONLY_AGENT=true`
+and approved `BROWSER_AGENT_DOMAINS` are configured in the local browser-worker.
+The Fastify `START_AGENT` button alone is intentionally refused when the task
+runner is present: POST a review task instead. Worker rechecks domain + exclusive
+ownership before any inspection. Account permissions and external writes remain OFF.
+
+Status values: `queued`, `running`, `done`, `failed`, `cancelled`.
+Reports and event steps are stored locally. Abandoned jobs are marked failed
+at runtime restart rather than being falsely marked complete. This is a
+user-started **one-tab read-only reviewer**, NOT an unrestricted autonomous AI
+agent, social publisher, multi-tab crawler or automatic messenger.
+The worker Chromium/VNC image, handoff and Windows integration are not yet
+confirmed working, and GitHub CI has not run on these changes.
+
 ## Phase 2D knowledge — code present, local database tests pending
 
 All endpoints require the local bearer token and PostgreSQL migration `003_knowledge.sql`.
