@@ -5,8 +5,11 @@ import { z } from "zod";
 import type { Config } from "./config.ts";
 import { StoreUnavailableError, type ControlStore } from "./store.ts";
 import type { AgentStatus, HealthResponse } from "../../src/lib/api/types.ts";
+import type { OllamaClient } from "./ollama.ts";
+import type { ChatStore } from "./chat-store.ts";
+import { registerChatRoutes } from "./chat-routes.ts";
 
-export const VERSION = "0.2.0-phase2a";
+export const VERSION = "0.2.1-phase2b";
 
 const controlBody = z.discriminatedUnion("type", [
   z.object({ type: z.literal("START_AGENT") }).strict(),
@@ -32,6 +35,7 @@ function tokenOk(header: string | undefined, token: string) {
 export async function buildApp(
   cfg: Pick<Config, "RUNTIME_TOKEN" | "CORS_ORIGINS">,
   store: ControlStore,
+  dependencies?: { ollama?: OllamaClient; chat?: ChatStore },
 ): Promise<FastifyInstance> {
   const startedAt = Date.now();
   const app = Fastify({ logger: false, bodyLimit: 16 * 1024 });
@@ -69,14 +73,23 @@ export async function buildApp(
     } catch (e) {
       pg = { name: "postgres", status: "down", detail: (e as Error).message.slice(0, 200) };
     }
-    const notProbed = "not probed in Phase 2A";
+    const notProbed = "not probed: integration not yet implemented";
+    let ollamaHealth: HealthResponse["services"][number] = { name: "ollama", status: "unknown", detail: notProbed };
+    if (dependencies?.ollama) {
+      try {
+        const models = await dependencies.ollama.listModels();
+        ollamaHealth = { name: "ollama", status: "up", detail: `${models.length} model(s) installed` };
+      } catch {
+        ollamaHealth = { name: "ollama", status: "down", detail: "local Ollama not reachable" };
+      }
+    }
     return {
       version: VERSION,
-      degraded: pg.status !== "up",
+      degraded: pg.status !== "up" || ollamaHealth.status === "down",
       services: [
         { name: "api", status: "up" },
         pg,
-        { name: "ollama", status: "unknown", detail: notProbed },
+        ollamaHealth,
         { name: "playwright", status: "unknown", detail: notProbed },
         { name: "novnc", status: "unknown", detail: notProbed },
       ],
@@ -108,5 +121,6 @@ export async function buildApp(
     return store.logs(q.data.limit);
   });
 
+  if (dependencies?.ollama && dependencies.chat) registerChatRoutes(app, dependencies.ollama, dependencies.chat);
   return app;
 }
