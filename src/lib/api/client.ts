@@ -4,6 +4,7 @@
  * UI labels them as mock data. Mock mode is never presented as a real integration.
  */
 import { mock } from "./mock";
+import type { ControlEvent, ControlSnapshot } from "../control-machine";
 import type {
   ActivityLog,
   AgentStatus,
@@ -73,8 +74,9 @@ const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.strin
 export const api = {
   health: () => request<HealthResponse>("/v1/health", undefined, mock.health),
   agentStatus: () => request<AgentStatus>("/v1/agent/status", undefined, mock.agentStatus),
-  sendControl: (event: string) =>
-    request<{ ok: true }>("/v1/agent/control", post({ event }), () => ({ ok: true as const })),
+  /** Sends the exact discriminated-union body the runtime validates: { type, reason?, error? }. */
+  sendControl: (event: ControlEvent) =>
+    request<{ ok: true; snapshot: ControlSnapshot }>("/v1/agent/control", post(event)),
   browserTabs: () => request<BrowserTab[]>("/v1/browser/tabs", undefined, mock.tabs),
   chatHistory: () => request<ChatMessage[]>("/v1/chat/messages", undefined, mock.chat),
   sendChat: (content: string) =>
