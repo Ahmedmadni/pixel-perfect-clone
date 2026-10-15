@@ -120,3 +120,12 @@ export interface ActivityLog {
   actor: "user" | "agent" | "system";
   message: string;
 }
+
+export interface LocalNotification {
+  id: string;
+  taskId: string | null;
+  kind: "task_done" | "task_failed" | "task_cancelled";
+  message: string;
+  createdAt: string;
+  readAt: string | null;
+}
