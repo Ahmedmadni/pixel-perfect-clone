@@ -91,6 +91,12 @@ export const api = {
   models: () => request<{ models: { name: string; size: number | null; parameterSize: string | null }[] }>("/v1/models", undefined, () => ({ models: [] })),
   streamChat: (content: string, model: string, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal) => streamLocalChat(content, model, onEvent, signal),
   tasks: () => request<AgentTask[]>("/v1/tasks", undefined, mock.tasks),
+  startReview: (objective: string, tabId: string, model: string) =>
+    request<AgentTask>("/v1/tasks", post({ objective, tabId, model })),
+  getReview: (id: string) =>
+    request<AgentTask>(`/v1/tasks/${encodeURIComponent(id)}`),
+  cancelReview: (id: string) =>
+    request<{ok: true; cancelling: true}>(`/v1/tasks/${encodeURIComponent(id)}/cancel`, post({})),
   accounts: () => request<BrowserAccount[]>("/v1/accounts", undefined, mock.accounts),
   schedules: () => request<ScheduledTask[]>("/v1/schedules", undefined, mock.schedules),
   approvals: () => request<ApprovalRequest[]>("/v1/approvals", undefined, mock.approvals),
