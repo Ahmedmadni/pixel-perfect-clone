@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api/client";
 import type { ActivityLog } from "@/lib/api/types";
@@ -16,7 +16,13 @@ const levelTone = { info: "info", warn: "warning", error: "danger", audit: "prim
 type Lvl = ActivityLog["level"] | "all";
 
 function ReportsPage() {
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ["logs"], queryFn: api.logs, refetchInterval: 10000 });
+  const notices = useQuery({ queryKey: ["notifications"], queryFn: api.notifications, refetchInterval: 10000, retry: 0 });
+  const markRead = useMutation({
+    mutationFn: (id: string) => api.markNotificationRead(id),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["notifications"] }); },
+  });
   const [lvl, setLvl] = useState<Lvl>("all");
   return (
     <>
@@ -27,6 +33,29 @@ function ReportsPage() {
           <Button key={l} size="sm" variant={lvl === l ? "default" : "secondary"} onClick={() => setLvl(l)}>{l === "all" ? "الكل" : l}</Button>
         ))}
       />
+      <Panel title="تنبيهات المهام المحلية">
+        <QueryState q={notices} empty="لا توجد إشعارات بعد">
+          {(items) => (
+            <ul className="divide-y">
+              {items.map((notice) => (
+                <li key={notice.id} className="flex items-start justify-between gap-3 py-3 text-sm">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Pill tone={notice.kind === "task_done" ? "success" : notice.kind === "task_failed" ? "danger" : "neutral"}>
+                        {notice.kind === "task_done" ? "اكتملت" : notice.kind === "task_cancelled" ? "ملغاة" : "فشلت"}
+                      </Pill>
+                      <span className={notice.readAt ? "text-muted-foreground" : "font-medium"}>{notice.message}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{fmtTime(notice.createdAt)}</p>
+                  </div>
+                  {!notice.readAt && <Button size="sm" variant="outline" disabled={markRead.isPending} onClick={() => markRead.mutate(notice.id)}>تحديد كمقروء</Button>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </QueryState>
+        {markRead.error && <p className="mt-2 text-xs text-destructive">تعذر تحديث الإشعار: {markRead.error.message}</p>}
+      </Panel>
       <Panel>
         <QueryState q={q}>
           {(ls) => (
