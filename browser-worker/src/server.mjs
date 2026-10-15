@@ -14,6 +14,7 @@ const display = process.env.DISPLAY ?? ":99";
 let mode = "STOPPED"; // Fail-closed on every start/restart.
 let generation = 0;
 let context;
+let activePage = null;
 const ids = new WeakMap();
 let queue = Promise.resolve();
 
@@ -76,16 +77,6 @@ function findPage(id) {
   return p;
 }
 
-function tabState() {
-  return pages().map((p) => ({
-    id: idOf(p),
-    title: "Browser tab", // Resolve actual page titles asynchronously below.
-    url: p.url(),
-    profileId: "local-default",
-    active: p === pages()[pages().length - 1],
-  }));
-}
-
 async function tabStates() {
   const list = pages();
   return Promise.all(list.map(async (p, i) => ({
@@ -93,7 +84,7 @@ async function tabStates() {
     title: (await p.title().catch(() => "")) || "Browser tab",
     url: p.url(),
     profileId: "local-default",
-    active: i === list.length - 1,
+    active: p === activePage,
   })));
 }
 
@@ -127,15 +118,21 @@ async function operation(data, actor, action) {
   if (action === "new") {
     const p = await context.newPage();
     await p.bringToFront();
+    activePage = p;
     return { tabId: idOf(p) };
   }
   if (action === "activate") {
     await page.bringToFront();
+    activePage = page;
     return { tabId: idOf(page) };
   }
   if (action === "close") {
     if (pages().length <= 1) throw new Error("last_tab_cannot_close");
     await page.close();
+    if (activePage === page) {
+      activePage = pages().at(-1) ?? null;
+      if (activePage) await activePage.bringToFront();
+    }
     return { closed: true };
   }
   if (action === "navigate") {
@@ -212,6 +209,7 @@ async function start() {
   context.setDefaultTimeout(10_000);
   context.setDefaultNavigationTimeout(12_000);
   if (!pages().length) await context.newPage();
+  activePage = pages().at(-1) ?? null;
   // Force server-side read-only input at every startup.
   vncViewOnly(true);
   server.listen(port, "0.0.0.0", () => console.log("Local browser worker ready"));
