@@ -46,7 +46,7 @@ This creates a gitignored `runtime/.env` and prints a one-time 64-character toke
 - Keep `OLLAMA_URL=http://127.0.0.1:11434`. Only loopback HTTP origins are accepted.
 - Never commit `.env`, send your token in chat, or expose PostgreSQL to the internet.
 
-Run database migrations and start the runtime:
+Run PostgreSQL migrations 001, 002 and 003 and start the runtime:
 
 ```powershell
 npm run migrate
@@ -137,7 +137,7 @@ Important: User-facing AI takeover remains unavailable until a real, permitted a
 
 - Phase 2B: code for Ollama discovery/streaming/history exists; **real local verification and regression tests remain pending**.
 - Phase 2C: browser-worker and live-viewer integration code added; Docker/Windows and VNC security tests remain pending.
-- Phase 2D: persistent Knowledge Center and real browser tasks/approvals.
+- Phase 2D: knowledge PostgreSQL CRUD and version history added to code; local migration tests, approved imports and contextual retrieval remain pending.
 - Login profiles for Facebook/WhatsApp/Instagram are not automated yet; platform terms and official API permissions will be respected.
 - Windows installation and runtime tests must be performed on the target PC before describing the system as operational.
 
