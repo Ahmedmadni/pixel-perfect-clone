@@ -18,7 +18,8 @@ export const CATEGORY_LABEL: Record<KnowledgeCategory, string> = {
 type Draft = { category: KnowledgeCategory; title: string; body: string; tags: string };
 
 export function KnowledgeManager({ categories }: { categories: KnowledgeCategory[] }) {
-  const { items, create, update, remove, restore } = useKnowledge();
+  const { items, create, update, remove, restore, error, refresh } = useKnowledge();
+  const [saving, setSaving] = useState(false);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<KnowledgeCategory | "all">("all");
   const [editing, setEditing] = useState<{ id: string | null; d: Draft } | null>(null);
@@ -34,12 +35,14 @@ export function KnowledgeManager({ categories }: { categories: KnowledgeCategory
     );
   }, [items, q, cat, categories]);
 
-  const save = () => {
-    if (!editing || !editing.d.title.trim()) return;
+  const save = async () => {
+    if (!editing || !editing.d.title.trim() || saving) return;
     const d = { ...editing.d, tags: editing.d.tags.split(",").map((t) => t.trim()).filter(Boolean) };
-    if (editing.id) update(editing.id, d);
-    else create(d);
-    setEditing(null);
+    setSaving(true);
+    try {
+      const ok = editing.id ? await update(editing.id, d) : await create(d);
+      if (ok) setEditing(null);
+    } finally { setSaving(false); }
   };
 
   return (
@@ -63,7 +66,9 @@ export function KnowledgeManager({ categories }: { categories: KnowledgeCategory
         </Button>
       </div>
 
-      {items === null ? (
+      {error ? (
+        <div className="space-y-2 text-sm text-destructive"><p>تعذر الاتصال بقاعدة البيانات المحلية: {error.message}</p><Button variant="outline" onClick={() => { void refresh(); }}>إعادة المحاولة</Button></div>
+      ) : items === null ? (
         <p className="text-sm text-muted-foreground">جارٍ التحميل…</p>
       ) : list.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">لا توجد عناصر مطابقة.</p>
@@ -87,7 +92,7 @@ export function KnowledgeManager({ categories }: { categories: KnowledgeCategory
                 <div className="flex gap-1">
                   <Button size="icon" variant="ghost" aria-label="السجل" onClick={() => setHistoryOf(i)}><History className="size-4" /></Button>
                   <Button size="icon" variant="ghost" aria-label="تعديل" onClick={() => setEditing({ id: i.id, d: { category: i.category, title: i.title, body: i.body, tags: i.tags.join(", ") } })}><Pencil className="size-4" /></Button>
-                  <Button size="icon" variant="ghost" aria-label="حذف" onClick={() => confirm("حذف هذا العنصر؟") && remove(i.id)}><Trash2 className="size-4" /></Button>
+                  <Button size="icon" variant="ghost" aria-label="حذف" onClick={() => { if (confirm("حذف هذا العنصر نهائيًا مع جميع إصداراته؟")) void remove(i.id); }}><Trash2 className="size-4" /></Button>
                 </div>
               </div>
             </Panel>
@@ -112,7 +117,7 @@ export function KnowledgeManager({ categories }: { categories: KnowledgeCategory
               <Input placeholder="وسوم مفصولة بفواصل" value={editing.d.tags} onChange={(e) => setEditing({ ...editing, d: { ...editing.d, tags: e.target.value } })} />
             </div>
           )}
-          <DialogFooter><Button onClick={save}>حفظ</Button></DialogFooter>
+          <DialogFooter><Button disabled={saving} onClick={() => { void save(); }}>{saving ? "جارٍ الحفظ…" : "حفظ"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -125,7 +130,7 @@ export function KnowledgeManager({ categories }: { categories: KnowledgeCategory
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs">v{h.version} · {fmtTime(h.at)}</span>
                   {h.version !== historyOf.version && (
-                    <Button size="sm" variant="outline" onClick={() => { restore(historyOf.id, h.version); setHistoryOf(null); }}>استعادة</Button>
+                    <Button size="sm" variant="outline" onClick={() => { void restore(historyOf.id, h.version).then((ok) => { if (ok) setHistoryOf(null); }); }}>استعادة</Button>
                   )}
                 </div>
                 <div className="mt-1 font-medium">{h.title}</div>
