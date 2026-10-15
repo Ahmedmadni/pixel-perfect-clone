@@ -254,6 +254,6 @@ export async function buildApp(
     return store.logs(q.data.limit);
   });
 
-  if (dependencies?.ollama && dependencies.chat) registerChatRoutes(app, dependencies.ollama, dependencies.chat);
+  if (dependencies?.ollama && dependencies.chat) registerChatRoutes(app, dependencies.ollama, dependencies.chat, dependencies.knowledge);
   return app;
 }
