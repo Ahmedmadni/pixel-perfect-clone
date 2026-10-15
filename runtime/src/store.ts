@@ -89,7 +89,13 @@ export class PgControlStore implements ControlStore {
 
   ping() {
     return this.wrap(async () => {
-      await this.pool.query("SELECT 1");
+      // Health is ready only when PostgreSQL AND the required migration are present.
+      const result = await this.pool.query<{ state: ControlState }>(
+        "SELECT state FROM control_state WHERE id = 1",
+      );
+      if (result.rowCount !== 1) {
+        throw new Error("control_state missing — run migrations");
+      }
     });
   }
 
