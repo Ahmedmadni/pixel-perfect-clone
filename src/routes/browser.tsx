@@ -15,10 +15,19 @@ export const Route = createFileRoute("/browser")({
 });
 
 function BrowserPage() {
-  const { snap, send } = useControl();
+  const { snap, send, connected, pending } = useControl();
+  const health = useQuery({ queryKey: ["health"], queryFn: api.health, retry: 0, refetchInterval: 10000 });
   const tabs = useQuery({ queryKey: ["tabs"], queryFn: api.browserTabs });
   const [connect, setConnect] = useState(false);
   const s = snap.state;
+  const noVncReady = health.data?.services.some((x) => x.name === "novnc" && x.status === "up") ?? false;
+  const agentReady = health.data?.services.some((x) => x.name === "playwright" && x.status === "up") ?? false;
+  const mayAct = MOCK_MODE || (connected && !pending);
+  const canConnect = !MOCK_MODE && connected && noVncReady;
+  const viewOnly = !connected || pending || s !== "MANUAL";
+  const viewerUrl = new URL(NOVNC_URL);
+  if (viewOnly) viewerUrl.searchParams.set("view_only", "1");
+  else viewerUrl.searchParams.delete("view_only");
 
   return (
     <>
@@ -27,10 +36,10 @@ function BrowserPage() {
         desc="عرض متصفح Chromium الحقيقي على جهازك عبر noVNC. لا يتم تضمين المواقع عبر iframe عادي."
         actions={
           <>
-            <Button size="sm" disabled={!canSend(s, "START_AGENT")} onClick={() => send({ type: "START_AGENT" })}><Play className="size-4" /> تسليم للوكيل</Button>
-            <Button size="sm" variant="secondary" disabled={!canSend(s, "TAKE_OVER")} onClick={() => send({ type: "TAKE_OVER" })}><Hand className="size-4" /> استلام يدوي</Button>
-            <Button size="sm" variant="secondary" disabled={!canSend(s, "PAUSE") && !canSend(s, "RESUME")} onClick={() => send({ type: s === "PAUSED" ? "RESUME" : "PAUSE" })}><Pause className="size-4" /> {s === "PAUSED" ? "استئناف" : "إيقاف مؤقت"}</Button>
-            <Button size="sm" variant="outline" disabled={!canSend(s, "RESET")} onClick={() => send({ type: "RESET" })}><RotateCcw className="size-4" /> إعادة ضبط</Button>
+            <Button size="sm" disabled={!mayAct || (!MOCK_MODE && (!noVncReady || !agentReady)) || !canSend(s, "START_AGENT")} onClick={() => send({ type: "START_AGENT" })}><Play className="size-4" /> تسليم للوكيل</Button>
+            <Button size="sm" variant="secondary" disabled={!mayAct || !canSend(s, "TAKE_OVER")} onClick={() => send({ type: "TAKE_OVER" })}><Hand className="size-4" /> استلام يدوي</Button>
+            <Button size="sm" variant="secondary" disabled={!mayAct || (!canSend(s, "PAUSE") && !canSend(s, "RESUME"))} onClick={() => send({ type: s === "PAUSED" ? "RESUME" : "PAUSE" })}><Pause className="size-4" /> {s === "PAUSED" ? "استئناف" : "إيقاف مؤقت"}</Button>
+            <Button size="sm" variant="outline" disabled={!mayAct || !canSend(s, "RESET")} onClick={() => send({ type: "RESET" })}><RotateCcw className="size-4" /> إعادة ضبط</Button>
           </>
         }
       />
@@ -46,18 +55,21 @@ function BrowserPage() {
             </QueryState>
           </div>
           <div className="relative aspect-video bg-sidebar">
-            {connect && !MOCK_MODE ? (
-              <iframe title="noVNC" src={NOVNC_URL} className="size-full" />
+            {connect && canConnect ? (
+              <div className="relative size-full">
+                <iframe title="noVNC" src={viewerUrl.toString()} className="size-full" inert={viewOnly} tabIndex={viewOnly ? -1 : 0} style={{ pointerEvents: viewOnly ? "none" : "auto" }} />
+                {viewOnly && <div className="absolute inset-0 z-10 flex items-end justify-center bg-black/10 pb-4" aria-label="المشاهدة فقط — التحكم مقفل"><span className="rounded-md bg-background/90 px-3 py-1 text-xs text-foreground">وضع المشاهدة فقط — لا يمكنك التحكم أثناء عمل الوكيل</span></div>}
+              </div>
             ) : (
               <div className="flex size-full flex-col items-center justify-center gap-4 p-6 text-center">
                 <Monitor className="size-12 text-muted-foreground" />
                 <div>
                   <div className="font-medium">شاشة المتصفح المحلي غير متصلة</div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {MOCK_MODE ? "الوضع التجريبي مفعّل — لا يوجد متصفح حقيقي." : `سيتم الاتصال بـ ${NOVNC_URL}`}
+                    {MOCK_MODE ? "الوضع التجريبي مفعّل — لا يوجد متصفح حقيقي." : !connected ? "لم يتم تأكيد الاتصال بالخادم. أدخل الرمز في الإعدادات أولاً." : !noVncReady ? "noVNC غير متحقق من تشغيله بعد؛ لا يمكن فتح جلسة تجريبية باعتبارها متصفحًا حقيقيًا." : `المتصفح متاح على ${NOVNC_URL}`}
                   </p>
                 </div>
-                <Button disabled={MOCK_MODE} onClick={() => setConnect(true)}>الاتصال بـ noVNC</Button>
+                <Button disabled={!canConnect} onClick={() => setConnect(true)}>الاتصال بـ noVNC</Button>
               </div>
             )}
             {s === "AGENT_ACTIVE" && <div className="pointer-events-none absolute inset-0 ring-4 ring-inset ring-primary/60" />}
@@ -77,7 +89,7 @@ function BrowserPage() {
                 </div>
               </div>
             )}
-            {s === "AGENT_ACTIVE" && (
+            {MOCK_MODE && s === "AGENT_ACTIVE" && (
               <Button size="sm" variant="outline" className="mt-3" onClick={() => send({ type: "REQUEST_APPROVAL", reason: "محاكاة: الوكيل يريد إرسال رسالة" })}>
                 محاكاة طلب موافقة
               </Button>
@@ -98,6 +110,8 @@ function BrowserPage() {
             )}
           </Panel>
           {MOCK_MODE && <Pill tone="warning">التبويبات المعروضة وهمية</Pill>}
+          {!MOCK_MODE && !noVncReady && <Pill tone="warning">المتصفح الحقيقي غير متحقق بعد</Pill>}
+          {!MOCK_MODE && !agentReady && <Pill tone="neutral">وكيل التصفح لم يتصل بعد</Pill>}
         </div>
       </div>
     </>
