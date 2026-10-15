@@ -61,7 +61,8 @@ function ChatPage() {
         for (let i = copy.length - 1; i >= 0; i--) {
           if (copy[i]?.role === "assistant" && copy[i]?.status === "streaming") { pos = i; break; }
         }
-        if (pos >= 0 && copy[pos]) copy[pos] = { ...copy[pos], content: copy[pos].content + event.text };
+        const previous = pos >= 0 ? copy[pos] : undefined;
+        if (previous) copy[pos] = { ...previous, content: previous.content + event.text };
         return copy;
       });
     } else if (event.type === "error") {
