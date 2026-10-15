@@ -34,7 +34,7 @@
 {"type":"FAIL","error":"Browser worker disconnected"}
 ```
 
-`EMERGENCY_STOP` and `FAIL` are valid from `MANUAL`, `AGENT_ACTIVE`, `APPROVAL_REQUIRED`, and `PAUSED`. `STOPPED` and `ERROR` can only exit through `RESET`. The runtime shares the pure transition table in `src/lib/control-machine.ts`, performs row-locked transactional changes, and appends an audit log.
+`EMERGENCY_STOP` and `FAIL` are valid from `MANUAL`, `AGENT_ACTIVE`, `APPROVAL_REQUIRED`, and `PAUSED`. `STOPPED` and `ERROR` can only exit through `RESET`. The runtime shares the pure transition table in `src/lib/control-machine.ts`, performs row-locked transactional changes, and appends an audit log. **Until Phase 2C installs a verified browser worker, `START_AGENT`, `APPROVE`, and `RESUME` return HTTP 503 `browser_agent_not_ready` and cannot mark the agent active.**
 
 **Agent ownership is a control record, not proof of a running browser worker.** The frontend must not offer handoff to real agent control until browser services are verified. Phase 2B adds local Ollama chat code but not browser control.
 
