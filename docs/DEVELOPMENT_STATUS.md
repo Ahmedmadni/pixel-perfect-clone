@@ -1,0 +1,54 @@
+# Personal AI Workspace — development status
+Date: 2026-10-16
+
+## Source of truth
+- Repository: `Ahmedmadni/pixel-perfect-clone`, branch `main`.
+- Lovable project: `d8eb5115-13ea-4fc2-9819-de495b7a7f34`.
+- Lovable's internal latest edit SHA has differed from GitHub main in prior checks. **Confirm synchronization before a fresh Lovable edit.** Do not force push or rewrite history.
+
+## Completed as source code, not as production verification
+
+### Phase 1 — UI
+Arabic RTL dashboard, clear mock-mode banner, navigation, demo pages, typed API layer, control-state reducer and tests.
+
+### Phase 2A — runtime foundation
+Fastify local API, PostgreSQL control/audit schema, bearer token and CORS, fail-closed transitions and logs. Previous Lovable report stated 65 frontend and 5 runtime tests passed **before** later changes; it did not run tests on Windows.
+
+### Phase 2B — Ollama chat code
+Native Ollama model discovery/streaming client, model picker, live text stream UI, stream cancellation, persistent chat migration 002, bounded context and tests. Real Ollama on Windows and tests of the current revisions are pending.
+
+### Phase 2C — free embedded Chromium architecture
+- `browser-worker/`: pinned free Playwright/Chromium worker with persistent profile, visible Xvfb desktop, x11vnc and noVNC.
+- `compose.browser.yml`: Docker Compose publishes worker and noVNC ports only on host loopback.
+- Separate worker bearer token and VNC password.
+- Worker starts STOPPED/view-only. Manual tab commands are authenticated through the Fastify gateway and checked again by the worker.
+- Fastify exposes real browser tab list/new/activate/navigate/close APIs when the worker is installed. Frontend uses them in real mode.
+- Agent top-level navigation is restricted to explicitly allowlisted HTTPS domains, including redirects.
+- **No autonomous agent loop exists yet.** Health deliberately distinguishes browser readiness from agent readiness; real agent takeover is disabled.
+
+### Phase 2D — knowledge and reply styles code
+- `003_knowledge.sql`: personal knowledge and full version-history tables.
+- Local PostgreSQL CRUD, optimistic concurrency (expectedVersion), restore and hard delete with content-free audit messages.
+- Real mode UI uses PostgreSQL; mock mode remains localStorage and never silently sends fake data.
+- Ollama chat includes a bounded locally retrieved selection of instructions, styles and request-relevant records.
+- No cloud database or paid vector service needed; full semantic memory, backup/import controls and device verification remain future work.
+
+## Tests added but not yet executed on the latest code
+- Browser policy: `browser-worker/test/policy.test.mjs`.
+- Fastify bridge: `runtime/test/browser.test.ts`.
+- PostgreSQL knowledge route contract: `runtime/test/knowledge.test.ts`.
+- Ollama model/stream and local-memory unit tests under `runtime/test/`.
+- Opt-in GitHub Actions: `.github/workflows/verify.yml` (manual workflow_dispatch, not automatic to conserve private-repository usage minutes).
+
+**Do not call this a tested system yet.** The unit tests added after earlier Lovable reports have not been independently run or validated on the owner's PC. Browser Docker image, Linux user namespace/seccomp, actual noVNC mouse ownership and persistent login sessions must be tested locally before declaring operational readiness.
+
+## Remaining milestones
+1. Run cloud CI/static checks and fix errors before local installation.
+2. Windows/WSL2 smoke test of PostgreSQL, Ollama, Docker browser worker, noVNC password and server-side VNC handoff.
+3. Phase 2E: implement the actual supervised agent runner, tool policy/approvals and verified outcomes, with per-account permissions disabled by default.
+4. Phase 2F: durable task scheduling, final reports and free internal/Telegram alerts where authorized.
+5. User-authorized import/export and encrypted backup of private knowledge and browser profiles.
+6. Audit integrations with official Facebook Pages/Instagram Business/WhatsApp Business APIs before enabling messaging; do not rely on unauthorized personal-account automation.
+
+## Zero-subscription principle
+All proposed browser components (Chromium, Playwright, Xvfb, x11vnc, noVNC), Fastify, PostgreSQL and Ollama are free/open-source software, but local hardware resources, electricity, Docker Desktop license eligibility and GitHub/Lovable free-tier quotas remain relevant. No paid browser-hosting service is required.
