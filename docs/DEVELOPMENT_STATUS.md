@@ -36,6 +36,13 @@ Native Ollama model discovery/streaming client, model picker, live text stream U
 - Agent switches control back to manual when task completes. Fail-closed startup and handoff protections remain.
 - Tests added, not independently executed; real Windows Docker/Ollama/PG verification pending.
 
+### Phase 2F — local notification inbox foundation
+- `005_notifications.sql`: local task status notices only, no copied page content.
+- Task completion/failure/cancellation writes an event atomically with its status.
+- Authenticated GET and mark-read endpoints, plus Reports UI inbox and refresh.
+- External Telegram/WhatsApp notification adapters and periodic schedules remain future, opt-in tasks.
+- New tests exist but have not run in this GitHub-only development session.
+
 ### Phase 2D — knowledge and reply styles code
 - `003_knowledge.sql`: personal knowledge and full version-history tables.
 - Local PostgreSQL CRUD, optimistic concurrency (expectedVersion), restore and hard delete with content-free audit messages.
