@@ -1,5 +1,5 @@
 /** Typed contracts for the local Fastify API. Mirrors docs/API.md. */
-import type { ControlState } from "../control-machine";
+import type { ControlSnapshot, ControlState } from "../control-machine";
 
 export type ConnectionStatus = "mock" | "connecting" | "online" | "offline" | "error";
 
@@ -11,6 +11,7 @@ export interface ServiceHealth {
 export interface HealthResponse {
   version: string;
   services: ServiceHealth[];
+  degraded?: boolean;
 }
 
 export interface AgentStatus {
@@ -18,6 +19,8 @@ export interface AgentStatus {
   currentTask: string | null;
   model: string | null;
   uptimeSec: number;
+  /** Authoritative snapshot from the runtime (absent in mock mode). */
+  snapshot?: ControlSnapshot;
 }
 
 export interface BrowserTab {
