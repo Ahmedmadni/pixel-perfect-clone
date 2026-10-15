@@ -108,7 +108,7 @@ describe("Phase 2B chat API", () => {
       if (String(url).includes("/api/tags")) return new Response(JSON.stringify({models: [{name: "installed"}]}));
       const posted = JSON.parse(String(init?.body)) as {messages: {role: string; content: string}[]};
       sentMessages = posted.messages;
-      return new Response('{"message":{"content":"أهلاً بك"},"done":false}\\n{"done":true}\\n');
+      return new Response('{"message":{"content":"أهلاً بك"},"done":false}\n{"done":true}\n');
     }));
     const knowledge = {
       forPrompt: async () => [{ category: "style", title: "أسلوبي المعتمد", body: "ردود قصيرة وواضحة ومهنية", tags: ["العمل"] }],
