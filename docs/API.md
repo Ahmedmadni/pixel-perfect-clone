@@ -51,11 +51,27 @@ POST /v1/chat/stream uses a validated *installed* model and streams newline-deli
 
 On error it emits `{"type":"error","error":"..."}` when the connection remains writable and records the failed/aborted assistant row. Aborting the client's fetch aborts the upstream Ollama generation. Chat messages are stored in the local `chat_messages` PostgreSQL table (migration 002). Chat history in real mode no longer uses mock responses.
 
+## Phase 2C browser integration — code present, local verification pending
+
+Fastify never exposes the browser worker secret to the browser UI. If
+`BROWSER_WORKER_TOKEN` is unset, these routes return 503 rather than simulated tabs.
+
+| Method | Endpoint | Body | Response |
+|---|---|---|---|
+| GET | `/v1/browser/tabs` | — | Real Chromium tabs (ID, title, URL, active status) |
+| POST | `/v1/browser/tabs` | `{"action":"new"}` | Newly opened tab ID |
+| POST | `/v1/browser/tabs` | `{"action":"activate","tabId":"UUID"}` | Activated tab ID |
+| POST | `/v1/browser/tabs` | `{"action":"close","tabId":"UUID"}` | `{"closed":true}` |
+| POST | `/v1/browser/tabs` | `{"action":"navigate","tabId":"UUID","url":"https://..."}` | Destination URL and tab ID |
+
+All POST tab operations require confirmed `MANUAL` control in PostgreSQL and worker-side manual ownership. VNC input is controlled by the x11vnc server itself through worker transitions, not just hidden buttons. The local worker uses a distinct strong token, separate from Fastify's frontend token. noVNC also requires a separate password. Both worker/noVNC ports are bound to `127.0.0.1` on the host.
+
+**AUTONOMOUS AGENT NOT YET IMPLEMENTED:** Health distinguishes working `playwright`/`novnc` from the future `agent`, which remains `unknown`. START_AGENT/APPROVE/RESUME are blocked until agentRunnerReady is explicitly verified. Browser inspection/navigate worker primitives are not a functioning AI planner. No posting or message sending is implemented.
+
 ## Planned routes — not implemented yet (do not label as operational)
 
 | Method | Endpoint | Intended use |
 |---|---|---|
-| GET | `/v1/browser/tabs` | Real browser tabs after Chromium/Playwright integration |
 | GET | `/v1/tasks` | Agent queue |
 | GET | `/v1/accounts` | Approved browser profiles and login states |
 | GET | `/v1/schedules` | Background task scheduler |
