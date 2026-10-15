@@ -29,7 +29,8 @@ function ConnectionPill() {
   if (MOCK_MODE) return <Pill tone="warning">وضع تجريبي</Pill>;
   if (q.isPending) return <Pill tone="neutral" dot>جارٍ الاتصال</Pill>;
   if (q.error) return <Pill tone="danger">الخادم غير متصل</Pill>;
-  if (q.data?.degraded) return <Pill tone="warning">الخادم متاح — قاعدة البيانات غير جاهزة</Pill>;
+  if (q.data?.services.some((s) => s.name === "postgres" && s.status === "down")) return <Pill tone="warning">الخادم متاح — قاعدة البيانات غير جاهزة</Pill>;
+  if (q.data?.degraded) return <Pill tone="warning">الخادم متاح — بعض الخدمات غير متصلة</Pill>;
   return <Pill tone="success" dot>الخادم المحلي متاح</Pill>;
 }
 
