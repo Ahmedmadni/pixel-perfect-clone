@@ -1,0 +1,9 @@
+{
+  "name": "paw-browser-worker",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node src/server.mjs", "test": "node --test test/*.test.mjs", "check": "node --check src/server.mjs" },
+  "dependencies": { "playwright": "1.64.0" }
+}
