@@ -39,15 +39,20 @@ const TABLE: Record<ControlState, Partial<Record<ControlEventType, ControlState>
   ERROR: { RESET: "MANUAL" },
 };
 
-/** Events valid from every state except where noted. */
+/** Terminal-until-reset states: the ONLY way out is RESET. */
+export const LOCKED_STATES: readonly ControlState[] = ["STOPPED", "ERROR"];
+
+/** Events valid from every non-locked (active or recoverable) state. */
 const GLOBAL: Partial<Record<ControlEventType, ControlState>> = {
   EMERGENCY_STOP: "STOPPED",
   FAIL: "ERROR",
 };
 
 export function nextState(state: ControlState, event: ControlEventType): ControlState | null {
-  if (event === "EMERGENCY_STOP" && state === "STOPPED") return null;
-  return TABLE[state][event] ?? GLOBAL[event] ?? null;
+  const local = TABLE[state][event];
+  if (local) return local;
+  if (LOCKED_STATES.includes(state)) return null;
+  return GLOBAL[event] ?? null;
 }
 
 export function canSend(state: ControlState, event: ControlEventType) {
@@ -57,7 +62,7 @@ export function canSend(state: ControlState, event: ControlEventType) {
 export interface ControlSnapshot {
   state: ControlState;
   reason: string | null;
-  history: { at: string; from: ControlState; to: ControlState; event: ControlEventType }[];
+  history: { at: string; from: ControlState; to: ControlState; event: ControlEventType | "STARTUP_RESET" }[];
 }
 
 export const initialControl: ControlSnapshot = { state: "MANUAL", reason: null, history: [] };

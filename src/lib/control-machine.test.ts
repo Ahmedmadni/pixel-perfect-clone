@@ -1,10 +1,76 @@
 import { describe, expect, it } from "vitest";
-import { CONTROL_STATES, controlReducer, initialControl, nextState } from "./control-machine";
+import {
+  CONTROL_STATES,
+  controlReducer,
+  initialControl,
+  nextState,
+  type ControlEventType,
+  type ControlState,
+} from "./control-machine";
 
-describe("control state machine", () => {
+const EVENTS: ControlEventType[] = [
+  "START_AGENT",
+  "REQUEST_APPROVAL",
+  "APPROVE",
+  "REJECT",
+  "PAUSE",
+  "RESUME",
+  "TAKE_OVER",
+  "EMERGENCY_STOP",
+  "FAIL",
+  "RESET",
+];
+
+/** Full expected matrix. Anything not listed must be rejected (null). */
+const EXPECTED: Record<ControlState, Partial<Record<ControlEventType, ControlState>>> = {
+  MANUAL: { START_AGENT: "AGENT_ACTIVE", EMERGENCY_STOP: "STOPPED", FAIL: "ERROR" },
+  AGENT_ACTIVE: {
+    REQUEST_APPROVAL: "APPROVAL_REQUIRED",
+    PAUSE: "PAUSED",
+    TAKE_OVER: "MANUAL",
+    EMERGENCY_STOP: "STOPPED",
+    FAIL: "ERROR",
+  },
+  APPROVAL_REQUIRED: {
+    APPROVE: "AGENT_ACTIVE",
+    REJECT: "MANUAL",
+    TAKE_OVER: "MANUAL",
+    EMERGENCY_STOP: "STOPPED",
+    FAIL: "ERROR",
+  },
+  PAUSED: { RESUME: "AGENT_ACTIVE", TAKE_OVER: "MANUAL", EMERGENCY_STOP: "STOPPED", FAIL: "ERROR" },
+  STOPPED: { RESET: "MANUAL" },
+  ERROR: { RESET: "MANUAL" },
+};
+
+describe("control state machine — full matrix", () => {
+  for (const st of CONTROL_STATES) {
+    for (const ev of EVENTS) {
+      const want = EXPECTED[st][ev] ?? null;
+      it(`${st} + ${ev} → ${want ?? "rejected"}`, () => {
+        expect(nextState(st, ev)).toBe(want);
+      });
+    }
+  }
+
+  it("STOPPED and ERROR can only exit via RESET", () => {
+    for (const st of ["STOPPED", "ERROR"] as const) {
+      for (const ev of EVENTS) {
+        if (ev !== "RESET") expect(nextState(st, ev)).toBeNull();
+      }
+    }
+  });
+
+  it("emergency stop works from every active/recoverable state", () => {
+    for (const st of ["MANUAL", "AGENT_ACTIVE", "APPROVAL_REQUIRED", "PAUSED"] as const) {
+      expect(nextState(st, "EMERGENCY_STOP")).toBe("STOPPED");
+    }
+  });
+});
+
+describe("controlReducer", () => {
   it("runs the happy path with an approval", () => {
     let s = controlReducer(initialControl, { type: "START_AGENT" });
-    expect(s.state).toBe("AGENT_ACTIVE");
     s = controlReducer(s, { type: "REQUEST_APPROVAL", reason: "send message" });
     expect(s.state).toBe("APPROVAL_REQUIRED");
     expect(s.reason).toBe("send message");
@@ -13,26 +79,9 @@ describe("control state machine", () => {
     expect(s.history).toHaveLength(3);
   });
 
-  it("emergency stop works from every non-stopped state", () => {
-    for (const st of CONTROL_STATES) {
-      expect(nextState(st, "EMERGENCY_STOP")).toBe(st === "STOPPED" ? null : "STOPPED");
-    }
-  });
-
-  it("rejects invalid transitions without changing state", () => {
-    const s = controlReducer(initialControl, { type: "APPROVE" });
-    expect(s).toBe(initialControl);
-    expect(nextState("STOPPED", "START_AGENT")).toBeNull();
-  });
-
-  it("recovers from error and stop only via RESET", () => {
-    expect(nextState("ERROR", "RESUME")).toBeNull();
-    expect(nextState("ERROR", "RESET")).toBe("MANUAL");
-    expect(nextState("STOPPED", "RESET")).toBe("MANUAL");
-  });
-
-  it("allows manual takeover while agent works", () => {
-    expect(nextState("AGENT_ACTIVE", "TAKE_OVER")).toBe("MANUAL");
-    expect(nextState("PAUSED", "TAKE_OVER")).toBe("MANUAL");
+  it("returns the same object for invalid transitions", () => {
+    expect(controlReducer(initialControl, { type: "APPROVE" })).toBe(initialControl);
+    const stopped = controlReducer(initialControl, { type: "EMERGENCY_STOP" });
+    expect(controlReducer(stopped, { type: "FAIL", error: "x" })).toBe(stopped);
   });
 });
