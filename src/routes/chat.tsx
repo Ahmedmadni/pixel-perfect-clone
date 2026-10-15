@@ -57,8 +57,11 @@ function ChatPage() {
     } else if (event.type === "delta") {
       setMessages((list) => {
         const copy = [...list];
-        const pos = copy.findLastIndex((m) => m.role === "assistant" && m.status === "streaming");
-        if (pos >= 0) copy[pos] = { ...copy[pos], content: copy[pos].content + event.text };
+        let pos = -1;
+        for (let i = copy.length - 1; i >= 0; i--) {
+          if (copy[i]?.role === "assistant" && copy[i]?.status === "streaming") { pos = i; break; }
+        }
+        if (pos >= 0 && copy[pos]) copy[pos] = { ...copy[pos], content: copy[pos].content + event.text };
         return copy;
       });
     } else if (event.type === "error") {
