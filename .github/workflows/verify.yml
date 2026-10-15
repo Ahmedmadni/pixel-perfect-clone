@@ -1,0 +1,49 @@
+name: Verify Cloud Development
+
+# Manual only: avoids consuming private-repository runner minutes on every commit.
+# Run through GitHub Actions > Verify Cloud Development > Run workflow when needed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Arabic UI tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install frontend dependencies from Bun lockfile
+        run: bun install --frozen-lockfile
+      - name: Frontend tests
+        run: bun run test
+      - name: TypeScript validation
+        run: bunx tsc --noEmit
+      - name: Frontend production build
+        run: bun run build
+        env:
+          VITE_MOCK_MODE: "true"
+
+  runtime:
+    name: Local-runtime static and mock-based tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: runtime/package-lock.json
+      - name: Install runtime dependencies
+        run: npm ci
+      - name: TypeScript validation
+        run: npm run typecheck
+      - name: Unit tests (without local browser/real PostgreSQL)
+        run: npm test
