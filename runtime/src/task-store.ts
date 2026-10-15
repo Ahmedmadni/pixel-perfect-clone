@@ -76,12 +76,26 @@ export class PgTaskRepository implements TaskRepository {
   }
   finish(id: string, status: "done" | "failed" | "cancelled", result = "", error = "") {
     return this.wrap(async () => {
-      const r = await this.pool.query(
-        `UPDATE agent_tasks SET status=$2, result=$3, error=$4,updated_at=now(),
-         finished_at=now() WHERE id=$1 AND status IN ('queued','running')`,
-        [id, status, result || null, error || null],
-      );
-      if (r.rowCount !== 1) throw new Error("task_not_active");
+      const client = await this.pool.connect();
+      try {
+        await client.query("BEGIN");
+        const r = await client.query(
+          `UPDATE agent_tasks SET status=$2, result=$3, error=$4,updated_at=now(),
+           finished_at=now() WHERE id=$1 AND status IN ('queued','running')`,
+          [id, status, result || null, error || null],
+        );
+        if (r.rowCount !== 1) throw new Error("task_not_active");
+        const kind = status === "done" ? "task_done" : status === "cancelled" ? "task_cancelled" : "task_failed";
+        const message = status === "done" ? "اكتملت مهمة مراجعة محلية" : status === "cancelled" ? "تم إلغاء مهمة المراجعة" : "تعذّر إكمال مهمة المراجعة";
+        await client.query(
+          "INSERT INTO notifications(id,task_id,kind,message) VALUES($1,$2,$3,$4)",
+          [randomUUID(), id, kind, message],
+        );
+        await client.query("COMMIT");
+      } catch (e) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw e;
+      } finally { client.release(); }
     });
   }
   list(limit: number) {
