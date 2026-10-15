@@ -12,6 +12,12 @@ const schema = z.object({
     .string()
     .min(32, "RUNTIME_TOKEN missing or too short — run `npm run token`"),
   DATABASE_URL: z.string().url(),
+  OLLAMA_URL: z.string().url().default("http://127.0.0.1:11434").refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) && !url.username && !url.password && !url.search && !url.hash;
+    } catch { return false; }
+  }, "OLLAMA_URL must be a trusted loopback HTTP URL"),
   CORS_ORIGINS: z
     .string()
     .default("http://localhost:8080,http://127.0.0.1:8080")
