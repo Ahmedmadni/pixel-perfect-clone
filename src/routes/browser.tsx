@@ -75,6 +75,7 @@ function BrowserPage() {
           }}>
             <Input dir="ltr" aria-label="عنوان الموقع" type="url" placeholder="https://example.com" value={address} onChange={(e) => setAddress(e.target.value)} disabled={!mayEditTabs} />
             <Button size="sm" type="submit" disabled={!mayEditTabs || !selectedTabId || !address.trim()}>انتقال</Button>
+            <Button size="sm" type="button" variant="outline" disabled={!mayEditTabs || !selectedTabId} onClick={() => selectedTabId && tabOperation.mutate({ action: "activate", tabId: selectedTabId })}>تفعيل التحكم اليدوي</Button>
           </form>
           {tabError && <p role="alert" className="px-3 py-2 text-xs text-destructive">تعذر تنفيذ العملية: {tabError}</p>}
           <div className="relative aspect-video bg-sidebar">
