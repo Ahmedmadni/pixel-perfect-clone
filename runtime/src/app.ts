@@ -11,7 +11,7 @@ import { registerChatRoutes } from "./chat-routes.ts";
 import { BrowserGateway } from "./browser-gateway.ts";
 import { nextState, type ControlEvent } from "../../src/lib/control-machine.ts";
 
-export const VERSION = "0.2.1-phase2b";
+export const VERSION = "0.3.0-phase2c-foundation";
 
 const controlBody = z.discriminatedUnion("type", [
   z.object({ type: z.literal("START_AGENT") }).strict(),
@@ -91,10 +91,10 @@ export async function buildApp(
         ollamaHealth = { name: "ollama", status: "down", detail: "local Ollama not reachable" };
       }
     }
-    let browserHealth: { ready: boolean; novnc: boolean } | null = null;
+    let browserHealth: { ready: boolean; novnc: boolean; agentRunnerReady: boolean } | null = null;
     if (dependencies?.browser) {
       try { browserHealth = await dependencies.browser.health(); }
-      catch { browserHealth = { ready: false, novnc: false }; }
+      catch { browserHealth = { ready: false, novnc: false, agentRunnerReady: false }; }
     }
     return {
       version: VERSION,
@@ -105,6 +105,7 @@ export async function buildApp(
         ollamaHealth,
         dependencies?.browser ? { name: "playwright", status: browserHealth?.ready ? "up" : "down" } : { name: "playwright", status: "unknown", detail: notProbed },
         dependencies?.browser ? { name: "novnc", status: browserHealth?.novnc ? "up" : "down" } : { name: "novnc", status: "unknown", detail: notProbed },
+        { name: "agent", status: "unknown", detail: "autonomous browser agent not implemented (Phase 2E)" },
       ],
     };
   });
@@ -114,7 +115,7 @@ export async function buildApp(
     if (["AGENT_ACTIVE", "APPROVAL_REQUIRED", "PAUSED"].includes(snapshot.state) && dependencies?.browser) {
       try {
         const worker = await dependencies.browser.health();
-        if (!worker.ready || worker.mode === "STOPPED") throw new Error("browser worker disconnected");
+        if (!worker.ready || worker.mode === "STOPPED" || (snapshot.state === "AGENT_ACTIVE" && !worker.agentRunnerReady)) throw new Error("browser worker disconnected");
       } catch {
         await store.apply({ type: "FAIL", error: "Browser worker was not reachable; execution stopped" }, "system");
         snapshot = await store.getSnapshot();
@@ -146,7 +147,7 @@ export async function buildApp(
           : agentStarts ? "AGENT_ACTIVE" : "MANUAL";
         try {
           const health = await dependencies.browser.health();
-          if (!health.ready || (agentStarts && !health.novnc)) throw new Error("browser_agent_not_ready");
+          if (!health.ready || (agentStarts && (!health.novnc || !health.agentRunnerReady))) throw new Error("browser_agent_not_ready");
           // Worker starts fail-closed, while the DB can initially say MANUAL.
           if (target === "AGENT_ACTIVE" && health.mode === "STOPPED" && before.state === "MANUAL") {
             await dependencies.browser.handoff("MANUAL");
