@@ -46,7 +46,7 @@ This creates a gitignored `runtime/.env` and prints a one-time 64-character toke
 - Keep `OLLAMA_URL=http://127.0.0.1:11434`. Only loopback HTTP origins are accepted.
 - Never commit `.env`, send your token in chat, or expose PostgreSQL to the internet.
 
-Run PostgreSQL migrations 001–004 and start the runtime:
+Run PostgreSQL migrations 001–004 (including read-only task history) and start the runtime:
 
 ```powershell
 npm run migrate
@@ -123,7 +123,7 @@ Do not run this inside the Lovable cloud preview. On the local Windows/WSL2 comp
    - `BROWSER_WORKER_TOKEN`: a fresh strong secret (at least 32 characters), separate from `RUNTIME_TOKEN`.
    - `VNC_PASSWORD`: a strong *different* password for noVNC (VNC protocol password length limitations apply).
    - `BROWSER_AGENT_DOMAINS`: leave empty for now; agent navigation must be explicitly approved later.
-3. For the experimental read-only agent, explicitly set `BROWSER_ENABLE_READONLY_AGENT=true` and an approved HTTPS domain list in `BROWSER_AGENT_DOMAINS` (example: `example.org` for harmless local validation). Otherwise leave it `false` and leave domains empty. No social posting or messaging is implemented.
+3. For the experimental read-only agent, explicitly set `BROWSER_ENABLE_READONLY_AGENT=true` and an approved HTTPS domain list in `BROWSER_AGENT_DOMAINS` (example: `example.org` for harmless local validation). Otherwise leave it `false` and leave domains empty. No social posting or messaging is implemented. A read-only review may be started from Browser Workspace after choosing an active tab, objective and an installed Ollama model; it stores the report locally and returns control to you.
 4. From the repository root, run `docker compose -f compose.browser.yml up --build`.
 5. Set **the same** `BROWSER_WORKER_TOKEN` in `runtime/.env` and keep `BROWSER_WORKER_URL=http://127.0.0.1:4300`. Restart the Fastify runtime.
 6. The noVNC viewer is on `http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale`. It requires the VNC password.
