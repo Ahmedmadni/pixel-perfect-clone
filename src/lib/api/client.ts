@@ -16,6 +16,7 @@ import type {
   ScheduledTask,
 } from "./types";
 import type { ControlEvent, ControlSnapshot } from "../control-machine";
+import type { BrowserTabAction } from "./types";
 
 export const API_BASE: string = import.meta.env["VITE_LOCAL_API_URL"] ?? "http://127.0.0.1:4100";
 export const NOVNC_URL: string =
@@ -84,6 +85,7 @@ export const api = {
   sendControl: (event: ControlEvent) =>
     request<{ ok: true; snapshot?: ControlSnapshot }>("/v1/agent/control", post(event), () => ({ ok: true as const })),
   browserTabs: () => request<BrowserTab[]>("/v1/browser/tabs", undefined, mock.tabs),
+  browserAction: (action: BrowserTabAction) => request<{ tabId?: string; closed?: boolean; url?: string }>("/v1/browser/tabs", post(action)),
   chatHistory: async () => (await request<{ messages: ChatMessage[]; nextBefore: number | null }>("/v1/chat/messages", undefined, () => ({ messages: mock.chat(), nextBefore: null }))).messages,
   models: () => request<{ models: { name: string; size: number | null; parameterSize: string | null }[] }>("/v1/models", undefined, () => ({ models: [] })),
   streamChat: (content: string, model: string, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal) => streamLocalChat(content, model, onEvent, signal),
