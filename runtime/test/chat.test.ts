@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { buildApp } from "../src/app.ts";
 import { OllamaClient } from "../src/ollama.ts";
 import type { ChatStore } from "../src/chat-store.ts";
+import type { PgKnowledgeStore } from "../src/knowledge-store.ts";
 import type { ControlStore } from "../src/store.ts";
 import type { ChatMessage, ChatMessageStatus } from "../../src/lib/api/types.ts";
 import { initialControl, nextState, type ControlSnapshot } from "../../src/lib/control-machine.ts";
@@ -101,4 +102,29 @@ describe("Phase 2B chat API", () => {
     expect(saved[1]?.content).toBe("أهلاً");
     await app.close();
   });
+  it("supplies local user-approved reply style to Ollama without cloud storage", async () => {
+    let sentMessages: { role: string; content: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string | URL, init?: RequestInit) => {
+      if (String(url).includes("/api/tags")) return new Response(JSON.stringify({models: [{name: "installed"}]}));
+      const posted = JSON.parse(String(init?.body)) as {messages: {role: string; content: string}[]};
+      sentMessages = posted.messages;
+      return new Response('{"message":{"content":"أهلاً بك"},"done":false}\\n{"done":true}\\n');
+    }));
+    const knowledge = {
+      forPrompt: async () => [{ category: "style", title: "أسلوبي المعتمد", body: "ردود قصيرة وواضحة ومهنية", tags: ["العمل"] }],
+    } as unknown as PgKnowledgeStore;
+    const app = await buildApp(cfg, control(), {
+      ollama: new OllamaClient("http://127.0.0.1:11434"), chat: history(), knowledge,
+    });
+    const res = await app.inject({
+      method: "POST", url: "/v1/chat/stream", headers,
+      payload: { model: "installed", content: "رد على العميل", conversationId: "default" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(sentMessages[0]?.role).toBe("system");
+    expect(sentMessages[0]?.content).toContain("أسلوبي المعتمد");
+    expect(sentMessages.at(-1)?.content).toBe("رد على العميل");
+    await app.close();
+  });
+
 });
