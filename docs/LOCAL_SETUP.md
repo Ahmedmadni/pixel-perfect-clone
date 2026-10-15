@@ -46,7 +46,7 @@ This creates a gitignored `runtime/.env` and prints a one-time 64-character toke
 - Keep `OLLAMA_URL=http://127.0.0.1:11434`. Only loopback HTTP origins are accepted.
 - Never commit `.env`, send your token in chat, or expose PostgreSQL to the internet.
 
-Run PostgreSQL migrations 001, 002 and 003 and start the runtime:
+Run PostgreSQL migrations 001–004 and start the runtime:
 
 ```powershell
 npm run migrate
@@ -123,11 +123,12 @@ Do not run this inside the Lovable cloud preview. On the local Windows/WSL2 comp
    - `BROWSER_WORKER_TOKEN`: a fresh strong secret (at least 32 characters), separate from `RUNTIME_TOKEN`.
    - `VNC_PASSWORD`: a strong *different* password for noVNC (VNC protocol password length limitations apply).
    - `BROWSER_AGENT_DOMAINS`: leave empty for now; agent navigation must be explicitly approved later.
-3. From the repository root, run `docker compose -f compose.browser.yml up --build`.
-4. Set **the same** `BROWSER_WORKER_TOKEN` in `runtime/.env` and keep `BROWSER_WORKER_URL=http://127.0.0.1:4300`. Restart the Fastify runtime.
-5. The noVNC viewer is on `http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale`. It requires the VNC password.
-6. Run `npm test` from `browser-worker` for policy tests. Use `/v1/health` to check real Chromium/noVNC status from Fastify.
-7. In the trusted local app, **المتصفح → الاتصال بـ noVNC**; use the tab buttons to activate manual control. The VNC server starts in view-only mode until the authorized local backend enables manual use.
+3. For the experimental read-only agent, explicitly set `BROWSER_ENABLE_READONLY_AGENT=true` and an approved HTTPS domain list in `BROWSER_AGENT_DOMAINS` (example: `example.org` for harmless local validation). Otherwise leave it `false` and leave domains empty. No social posting or messaging is implemented.
+4. From the repository root, run `docker compose -f compose.browser.yml up --build`.
+5. Set **the same** `BROWSER_WORKER_TOKEN` in `runtime/.env` and keep `BROWSER_WORKER_URL=http://127.0.0.1:4300`. Restart the Fastify runtime.
+6. The noVNC viewer is on `http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale`. It requires the VNC password.
+7. Run `npm test` from `browser-worker` for policy tests. Use `/v1/health` to check real Chromium/noVNC status from Fastify.
+8. In the trusted local app, **المتصفح → الاتصال بـ noVNC**; use the tab buttons to activate manual control. The VNC server starts in view-only mode until the authorized local backend enables manual use.
 
 If Chromium's sandbox cannot run with your host's user namespace/seccomp configuration, do not disable the sandbox silently. Stop and configure a supported restricted environment. The Microsoft Playwright Docker image is a development baseline, not a hardened production security guarantee.
 
