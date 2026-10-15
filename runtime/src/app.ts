@@ -47,7 +47,7 @@ export async function buildApp(
     controlQueue = next.catch(() => {});
     return next;
   }
-  const app = Fastify({ logger: false, bodyLimit: 16 * 1024 });
+  const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
 
   await app.register(cors, {
     origin: (origin, cb) => cb(null, !origin || cfg.CORS_ORIGINS.includes(origin)),
