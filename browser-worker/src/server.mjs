@@ -98,7 +98,7 @@ async function tabStates() {
 }
 
 function browserHealth() {
-  return { ready: Boolean(context), mode, viewOnly: mode !== "MANUAL", tabs: context ? pages().length : 0 };
+  return { ready: Boolean(context), mode, viewOnly: mode !== "MANUAL", tabs: context ? pages().length : 0, agentRunnerReady: false };
 }
 
 async function setMode(target) {
