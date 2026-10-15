@@ -1,6 +1,6 @@
 # Personal AI Workspace — Windows local setup (Phase 2A + 2B)
 
-This setup starts the API, PostgreSQL-backed controls and **local Ollama chat integration**. It does **not** install the Phase 2C Chromium browser/noVNC or an autonomous browser agent. No Windows verification has been performed yet.
+This setup starts the API, PostgreSQL-backed controls and **local Ollama chat integration**. Phase 2C now includes a separate Chromium + Playwright + noVNC Docker service, but **none of this has been verified on the user's Windows machine**. Autonomous AI browser actions are still disabled.
 
 ## Prerequisites
 
@@ -114,10 +114,29 @@ npm test
 
 Read `runtime/test/pg.test.ts` before running this. Tests and migrations require appropriate database privileges. Do not configure the test runner against a personal data database.
 
-## 6. What is still missing
+## 6. Phase 2C: run the local Chromium + noVNC service (optional until testing)
+
+Do not run this inside the Lovable cloud preview. On the local Windows/WSL2 computer:
+
+1. Install Docker Desktop or a compatible local Docker Engine.
+2. Copy `browser-worker/.env.example` to `browser-worker/.env` and enter:
+   - `BROWSER_WORKER_TOKEN`: a fresh strong secret (at least 32 characters), separate from `RUNTIME_TOKEN`.
+   - `VNC_PASSWORD`: a strong *different* password for noVNC (VNC protocol password length limitations apply).
+   - `BROWSER_AGENT_DOMAINS`: leave empty for now; agent navigation must be explicitly approved later.
+3. From the repository root, run `docker compose -f compose.browser.yml up --build`.
+4. Set **the same** `BROWSER_WORKER_TOKEN` in `runtime/.env` and keep `BROWSER_WORKER_URL=http://127.0.0.1:4300`. Restart the Fastify runtime.
+5. The noVNC viewer is on `http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale`. It requires the VNC password.
+6. Run `npm test` from `browser-worker` for policy tests. Use `/v1/health` to check real Chromium/noVNC status from Fastify.
+7. In the trusted local app, **المتصفح → الاتصال بـ noVNC**; use the tab buttons to activate manual control. The VNC server starts in view-only mode until the authorized local backend enables manual use.
+
+If Chromium's sandbox cannot run with your host's user namespace/seccomp configuration, do not disable the sandbox silently. Stop and configure a supported restricted environment. The Microsoft Playwright Docker image is a development baseline, not a hardened production security guarantee.
+
+Important: User-facing AI takeover remains unavailable until a real, permitted autonomous runner exists. Opening or manipulating actual social accounts via AI automation must respect the platforms' permissions and terms; no auto-posting is implemented.
+
+## 7. What is still missing
 
 - Phase 2B: code for Ollama discovery/streaming/history exists; **real local verification and regression tests remain pending**.
-- Phase 2C: Chromium/Playwright persistent profiles and noVNC live viewer.
+- Phase 2C: browser-worker and live-viewer integration code added; Docker/Windows and VNC security tests remain pending.
 - Phase 2D: persistent Knowledge Center and real browser tasks/approvals.
 - Login profiles for Facebook/WhatsApp/Instagram are not automated yet; platform terms and official API permissions will be respected.
 - Windows installation and runtime tests must be performed on the target PC before describing the system as operational.
