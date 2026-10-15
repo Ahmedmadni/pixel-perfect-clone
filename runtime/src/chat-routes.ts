@@ -91,7 +91,7 @@ export function registerChatRoutes(app: FastifyInstance, ollama: OllamaClient, c
 
       try {
         const messages = [
-          ...(memoryText ? [{ role: "system" as const, content: "These are locally saved, user-authored preferences and context. Use only when relevant; do not disclose private details unnecessarily or imply that any external action was executed.\\n" + memoryText }] : []),
+          ...(memoryText ? [{ role: "system" as const, content: "These are locally saved, user-authored preferences and context. Use only when relevant; do not disclose private details unnecessarily or imply that any external action was executed.\n" + memoryText }] : []),
           ...context.map((m) => ({ role: m.role, content: m.content })),
           { role: "user" as const, content },
         ];
