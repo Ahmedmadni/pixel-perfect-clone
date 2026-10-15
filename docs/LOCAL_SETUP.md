@@ -1,12 +1,13 @@
-# Personal AI Workspace — Windows local setup (Phase 2A)
+# Personal AI Workspace — Windows local setup (Phase 2A + 2B)
 
-This setup starts the **API and PostgreSQL-backed control state only**. It does **not** install a real agent, browser, noVNC, or AI model. A successful API health check does not mean those integrations are operational.
+This setup starts the API, PostgreSQL-backed controls and **local Ollama chat integration**. It does **not** install the Phase 2C Chromium browser/noVNC or an autonomous browser agent. No Windows verification has been performed yet.
 
 ## Prerequisites
 
 - Windows 10/11, PowerShell, Git, Node.js **22 or newer** (the runtime uses Node's `process.loadEnvFile`).
 - PostgreSQL (16 or newer recommended), running locally.
-- WSL2 is optional for Phase 2A; it will be useful later for the Chromium/noVNC container setup.
+- Install the free Ollama application on Windows, then run `ollama pull llama3.2` in PowerShell when suitable for your hardware. Ollama must respond locally on `http://127.0.0.1:11434`.
+- WSL2 is optional until Phase 2C, when we will run Chromium/noVNC.
 - No paid browser or cloud service is required for Phase 2A.
 
 ## 1. Clone and install
@@ -42,6 +43,7 @@ This creates a gitignored `runtime/.env` and prints a one-time 64-character toke
 - Set `DATABASE_URL=postgres://paw:<URL_ENCODED_PASSWORD>@127.0.0.1:5432/paw`.
 - Keep `RUNTIME_HOST=127.0.0.1`, `RUNTIME_PORT=4100`.
 - Keep `CORS_ORIGINS` restricted to the actual local frontend origin (e.g. `http://localhost:8080`).
+- Keep `OLLAMA_URL=http://127.0.0.1:11434`. Only loopback HTTP origins are accepted.
 - Never commit `.env`, send your token in chat, or expose PostgreSQL to the internet.
 
 Run database migrations and start the runtime:
@@ -57,7 +59,15 @@ In a separate PowerShell window, check the public health endpoint:
 Invoke-RestMethod http://127.0.0.1:4100/v1/health
 ```
 
-Expected **only after successful local testing**: API and PostgreSQL report `up`; Ollama/Playwright/noVNC remain `unknown` in Phase 2A. Missing migration or database connectivity must be fixed before control can work.
+Expected **only after successful local testing**: API and PostgreSQL report `up`; Ollama reports `up` when `/api/tags` responds, or `down` otherwise; Playwright/noVNC remain `unknown`. Missing migrations or database connectivity must be fixed before starting the runtime/chat.
+
+After starting the runtime, check that Ollama itself is available:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:11434/api/tags
+```
+
+The result must list installed models. The app's chat selector fetches the available models using the authenticated local Fastify API. Run `npm run migrate` after pulling changes, since Phase 2B adds `002_chat.sql`. No personal-data uploads or paid API keys are needed.
 
 ## 4. Start the local frontend
 
@@ -106,7 +116,7 @@ Read `runtime/test/pg.test.ts` before running this. Tests and migrations require
 
 ## 6. What is still missing
 
-- Phase 2B: verified local Ollama connection and chat execution.
+- Phase 2B: code for Ollama discovery/streaming/history exists; **real local verification and regression tests remain pending**.
 - Phase 2C: Chromium/Playwright persistent profiles and noVNC live viewer.
 - Phase 2D: persistent Knowledge Center and real browser tasks/approvals.
 - Login profiles for Facebook/WhatsApp/Instagram are not automated yet; platform terms and official API permissions will be respected.
