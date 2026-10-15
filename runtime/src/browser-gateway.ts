@@ -67,4 +67,10 @@ export class BrowserGateway {
   activateTab(tabId: string) { return this.call<{tabId: string}>("/tabs/activate", {tabId}); }
   closeTab(tabId: string) { return this.call<{closed: boolean}>("/tabs/close", {tabId}); }
   navigate(tabId: string, url: string) { return this.call<{tabId: string; url: string}>("/tabs/navigate", {tabId, url}); }
+  /** Reads only an explicitly allowed HTTPS page. The worker rechecks both ownership and domain. */
+  inspect(tabId: string) {
+    return this.call<{ tabId: string; title: string; url: string; untrustedPageText: string }>(
+      "/agent/inspect", { tabId },
+    );
+  }
 }
