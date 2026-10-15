@@ -8,6 +8,7 @@ export interface WorkerHealth {
   viewOnly: boolean;
   tabs: number;
   novnc: boolean;
+  agentRunnerReady: boolean;
 }
 export interface WorkerTab {
   id: string;
