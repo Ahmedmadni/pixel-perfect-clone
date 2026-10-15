@@ -26,6 +26,16 @@ Native Ollama model discovery/streaming client, model picker, live text stream U
 - Agent top-level navigation is restricted to explicitly allowlisted HTTPS domains, including redirects.
 - **No autonomous agent loop exists yet.** Health deliberately distinguishes browser readiness from agent readiness; real agent takeover is disabled.
 
+### Phase 2E — supervised read-only browser review code
+- `004_agent_tasks.sql`: persistent read-only jobs, statuses, reports and execution steps.
+- `runtime/src/read-only-agent.ts`: one-task-at-a-time, explicit user-selected tab and locally installed Ollama model.
+- `POST /v1/tasks` starts a read-only review, GET lists/results, POST cancel requests cancellation.
+- Browser worker permission is **opt-in only**: `BROWSER_ENABLE_READONLY_AGENT=true` plus explicit approved domains; inspection checks domain before reading.
+- No clicking, posting, replies, account changes or message sending are supported.
+- The UI provides objective/model selection, cancel, and persisted report display.
+- Agent switches control back to manual when task completes. Fail-closed startup and handoff protections remain.
+- Tests added, not independently executed; real Windows Docker/Ollama/PG verification pending.
+
 ### Phase 2D — knowledge and reply styles code
 - `003_knowledge.sql`: personal knowledge and full version-history tables.
 - Local PostgreSQL CRUD, optimistic concurrency (expectedVersion), restore and hard delete with content-free audit messages.
@@ -45,8 +55,8 @@ Native Ollama model discovery/streaming client, model picker, live text stream U
 ## Remaining milestones
 1. Run cloud CI/static checks and fix errors before local installation.
 2. Windows/WSL2 smoke test of PostgreSQL, Ollama, Docker browser worker, noVNC password and server-side VNC handoff.
-3. Phase 2E: implement the actual supervised agent runner, tool policy/approvals and verified outcomes, with per-account permissions disabled by default.
-4. Phase 2F: durable task scheduling, final reports and free internal/Telegram alerts where authorized.
+3. Phase 2E extension: test the read-only reviewer end-to-end; then build a user-approved tool/action queue, permissions and explicit confirmation before any external write.
+4. Phase 2F: durable task scheduling and optional free internal/Telegram status alerts with opt-in and no personal page content by default.
 5. User-authorized import/export and encrypted backup of private knowledge and browser profiles.
 6. Audit integrations with official Facebook Pages/Instagram Business/WhatsApp Business APIs before enabling messaging; do not rely on unauthorized personal-account automation.
 
