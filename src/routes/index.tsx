@@ -35,7 +35,7 @@ function Overview() {
         </Panel>
         <Panel>
           <div className="text-xs text-muted-foreground">مهام في الطابور</div>
-          <div className="mt-1 font-mono text-3xl">{tasks.data?.filter((t) => t.status !== "done").length ?? "—"}</div>
+          <div className="mt-1 font-mono text-3xl">{tasks.data?.filter((t) => ["queued", "running", "awaiting_approval"].includes(t.status)).length ?? "—"}</div>
         </Panel>
         <Panel>
           <div className="text-xs text-muted-foreground">مصدر البيانات</div>
