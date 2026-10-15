@@ -6,6 +6,7 @@ import { PgControlStore } from "./store.ts";
 import { OllamaClient } from "./ollama.ts";
 import { PgChatStore } from "./chat-store.ts";
 import { BrowserGateway } from "./browser-gateway.ts";
+import { PgKnowledgeStore } from "./knowledge-store.ts";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 const cfg = loadConfig();
@@ -16,7 +17,7 @@ pool.on("error", (e) => console.error("[pg] idle client error:", e.message));
 const chat = new PgChatStore(pool);
 await chat.recover(); // Requires migration 002; never silently fall back to in-memory storage.
 const browser = cfg.BROWSER_WORKER_TOKEN.length >= 32 ? new BrowserGateway(cfg.BROWSER_WORKER_URL, cfg.BROWSER_WORKER_TOKEN) : undefined;
-const app = await buildApp(cfg, new PgControlStore(pool), { ollama: new OllamaClient(cfg.OLLAMA_URL), chat, ...(browser ? {browser} : {}) });
+const app = await buildApp(cfg, new PgControlStore(pool), { ollama: new OllamaClient(cfg.OLLAMA_URL), chat, knowledge: new PgKnowledgeStore(pool), ...(browser ? {browser} : {}) });
 await app.listen({ host: cfg.RUNTIME_HOST, port: cfg.RUNTIME_PORT });
 console.log(`PAW runtime listening on http://${cfg.RUNTIME_HOST}:${cfg.RUNTIME_PORT}`);
 
