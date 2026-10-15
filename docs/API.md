@@ -1,6 +1,6 @@
-# Personal AI Workspace — local HTTP API (Phase 2A)
+# Personal AI Workspace — local HTTP API (Phase 2A + Phase 2B code)
 
-**Current verified scope:** API foundation and SQL migrations are implemented in the repository. These do not make the AI model or browser operational. Local Windows testing is still required.
+**Current scope:** Fastify control API and Ollama chat integration are implemented in code. Actual Ollama/Windows connection and comprehensive Phase 2B verification are still pending. Chromium/noVNC is NOT implemented.
 
 - Base URL: `http://127.0.0.1:4100` by default (set `VITE_LOCAL_API_URL` for the frontend).
 - HTTP JSON responses. `GET /v1/health` is public; every other implemented route requires `Authorization: Bearer <RUNTIME_TOKEN>`.
@@ -8,7 +8,7 @@
 - `VITE_MOCK_MODE=true` is the default: all frontend requests use clearly labeled mock data and do not hit the runtime.
 - Runtime source: `runtime/src/app.ts`. API data types: `src/lib/api/types.ts`.
 
-## Actually implemented in the runtime (Phase 2A)
+## Implemented routes (Phase 2A + 2B, pending integration validation)
 
 | Method | Endpoint | Request | Success response | Failure |
 |---|---|---|---|---|
@@ -16,6 +16,9 @@
 | GET | `/v1/agent/status` | Authorization header | `AgentStatus` including authoritative `snapshot` | 401/403/503 |
 | POST | `/v1/agent/control` | ControlEvent JSON with `type` (see below) | `{ "ok": true, "snapshot": ControlSnapshot }` | 400 bad payload; 409 invalid transition; 503 unavailable |
 | GET | `/v1/logs?limit=100` | Authorization header; limit 1–500 | `ActivityLog[]` | 400/401/403/503 |
+| GET | `/v1/models` | Authorization header | `{models: [{name, size, family, ...}]}` from Ollama `/api/tags` | 503 offline |
+| GET | `/v1/chat/messages?conversationId=default&limit=50` | Authorization header; optional cursor `before` | `{messages: ChatMessage[], nextBefore}` oldest-to-newest page | 400/401/503 |
+| POST | `/v1/chat/stream` | `{content,model,conversationId:"default"}` | `application/x-ndjson` incremental events | 400/409/503; stream `error` event |
 
 **IMPORTANT:** The event body uses the key **`type`**, not `event`. Examples:
 
@@ -33,14 +36,26 @@
 
 `EMERGENCY_STOP` and `FAIL` are valid from `MANUAL`, `AGENT_ACTIVE`, `APPROVAL_REQUIRED`, and `PAUSED`. `STOPPED` and `ERROR` can only exit through `RESET`. The runtime shares the pure transition table in `src/lib/control-machine.ts`, performs row-locked transactional changes, and appends an audit log.
 
-**Agent ownership is a control record, not proof of a running browser worker.** The frontend must not offer handoff to real agent control until services are explicitly verified and tested. Browser and model are **NOT implemented** in Phase 2A.
+**Agent ownership is a control record, not proof of a running browser worker.** The frontend must not offer handoff to real agent control until browser services are verified. Phase 2B adds local Ollama chat code but not browser control.
+
+## Streaming protocol (Phase 2B)
+
+POST /v1/chat/stream uses a validated *installed* model and streams newline-delimited JSON events:
+
+```json
+{"type":"user","message":{"id":"...","role":"user","content":"Hello","at":"..."}}
+{"type":"assistant_start","message":{"id":"...","role":"assistant","content":"","status":"streaming","at":"..."}}
+{"type":"delta","text":"مرحبا"}
+{"type":"done","message":{"id":"...","role":"assistant","content":"مرحبا","status":"complete","at":"..."}}
+```
+
+On error it emits `{"type":"error","error":"..."}` when the connection remains writable and records the failed/aborted assistant row. Aborting the client's fetch aborts the upstream Ollama generation. Chat messages are stored in the local `chat_messages` PostgreSQL table (migration 002). Chat history in real mode no longer uses mock responses.
 
 ## Planned routes — not implemented yet (do not label as operational)
 
 | Method | Endpoint | Intended use |
 |---|---|---|
 | GET | `/v1/browser/tabs` | Real browser tabs after Chromium/Playwright integration |
-| GET/POST | `/v1/chat/messages` | Ollama-backed conversation, persisted history |
 | GET | `/v1/tasks` | Agent queue |
 | GET | `/v1/accounts` | Approved browser profiles and login states |
 | GET | `/v1/schedules` | Background task scheduler |
