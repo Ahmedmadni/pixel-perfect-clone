@@ -69,7 +69,9 @@ export function registerChatRoutes(app: FastifyInstance, ollama: OllamaClient, c
       assistantId = assistant.id;
 
       reply.hijack();
+      const trustedOrigin = request.headers.origin;
       reply.raw.writeHead(200, {
+        ...(trustedOrigin ? { "Access-Control-Allow-Origin": trustedOrigin, "Vary": "Origin" } : {}),
         "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-store, no-transform",
         "X-Content-Type-Options": "nosniff",
