@@ -137,9 +137,27 @@ async function operation(data, actor, action) {
   }
   if (action === "navigate") {
     const url = validateBrowserUrl(data.url, actor === "agent", allowedDomains);
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 12_000 });
-    if (generationAtStart !== generation) throw new Error("ownership_changed");
-    return { tabId: idOf(page), url: page.url() };
+    // Redirects are checked too. Main-frame navigation may not escape approved
+    // HTTPS domains; third-party subresources are not treated as new top-level sites.
+    const guard = async (route) => {
+      try {
+        const request = route.request();
+        if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
+          validateBrowserUrl(request.url(), true, allowedDomains);
+        }
+        await route.continue();
+      } catch {
+        await route.abort("blockedbyclient").catch(() => {});
+      }
+    };
+    if (actor === "agent") await page.route("**/*", guard);
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 12_000 });
+      if (generationAtStart !== generation) throw new Error("ownership_changed");
+      return { tabId: idOf(page), url: page.url() };
+    } finally {
+      if (actor === "agent") await page.unroute("**/*", guard);
+    }
   }
   if (action === "inspect") {
     const title = await page.title();
