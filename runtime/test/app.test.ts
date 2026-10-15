@@ -44,7 +44,7 @@ describe("runtime API", () => {
   });
 
   it("applies valid transitions and returns 409 for invalid", async () => {
-    const app = await buildApp(cfg, memStore());
+    const app = await buildApp(cfg, memStore(), { browserReady: () => true });
     const post = (body: unknown) => app.inject({ method: "POST", url: "/v1/agent/control", headers: auth, payload: body as object });
     const ok = await post({ type: "START_AGENT" });
     expect(ok.statusCode).toBe(200);
@@ -53,6 +53,13 @@ describe("runtime API", () => {
     const bad = await post({ type: "START_AGENT" });
     expect(bad.statusCode).toBe(409);
     expect(bad.json().snapshot.state).toBe("STOPPED");
+  });
+
+  it("refuses to report agent active before a real browser worker is verified", async () => {
+    const app = await buildApp(cfg, memStore());
+    const result = await app.inject({ method: "POST", url: "/v1/agent/control", headers: auth, payload: { type: "START_AGENT" } });
+    expect(result.statusCode).toBe(503);
+    expect(result.json().error).toBe("browser_agent_not_ready");
   });
 
   it("validates bodies strictly", async () => {
