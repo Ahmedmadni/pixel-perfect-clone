@@ -96,6 +96,21 @@ export class PgControlStore implements ControlStore {
       if (result.rowCount !== 1) {
         throw new Error("control_state missing — run migrations");
       }
+      // The API is not ready if chat, knowledge, tasks or notification tables
+      // have not been installed. Do not report a healthy database prematurely.
+      const applied = await this.pool.query<{ name: string }>(
+        "SELECT name FROM schema_migrations WHERE name = ANY($1::text[])",
+        [[
+          "001_control_and_audit.sql",
+          "002_chat.sql",
+          "003_knowledge.sql",
+          "004_agent_tasks.sql",
+          "005_notifications.sql",
+        ]],
+      );
+      if (applied.rowCount !== 5) {
+        throw new Error("PostgreSQL migrations 001–005 are required");
+      }
     });
   }
 
