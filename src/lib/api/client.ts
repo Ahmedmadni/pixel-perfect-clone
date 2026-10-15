@@ -84,14 +84,9 @@ export const api = {
   sendControl: (event: ControlEvent) =>
     request<{ ok: true; snapshot?: ControlSnapshot }>("/v1/agent/control", post(event), () => ({ ok: true as const })),
   browserTabs: () => request<BrowserTab[]>("/v1/browser/tabs", undefined, mock.tabs),
-  chatHistory: () => request<ChatMessage[]>("/v1/chat/messages", undefined, mock.chat),
-  sendChat: (content: string) =>
-    request<ChatMessage>("/v1/chat/messages", post({ content }), () => ({
-      id: crypto.randomUUID(),
-      role: "assistant" as const,
-      content: "[وضع تجريبي] لا يوجد نموذج Ollama متصل. هذا رد وهمي.",
-      at: new Date().toISOString(),
-    })),
+  chatHistory: async () => (await request<{ messages: ChatMessage[]; nextBefore: number | null }>("/v1/chat/messages", undefined, () => ({ messages: mock.chat(), nextBefore: null }))).messages,
+  models: () => request<{ models: { name: string; size: number | null; parameterSize: string | null }[] }>("/v1/models", undefined, () => ({ models: [] })),
+  streamChat: (content: string, model: string, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal) => streamLocalChat(content, model, onEvent, signal),
   tasks: () => request<AgentTask[]>("/v1/tasks", undefined, mock.tasks),
   accounts: () => request<BrowserAccount[]>("/v1/accounts", undefined, mock.accounts),
   schedules: () => request<ScheduledTask[]>("/v1/schedules", undefined, mock.schedules),
@@ -102,3 +97,72 @@ export const api = {
     })),
   logs: () => request<ActivityLog[]>("/v1/logs", undefined, mock.logs),
 };
+
+export type ChatStreamEvent =
+  | { type: "user" | "assistant_start" | "done"; message: ChatMessage }
+  | { type: "delta"; text: string }
+  | { type: "error"; error: string };
+
+async function streamLocalChat(
+  content: string, model: string, onEvent: (event: ChatStreamEvent) => void, signal: AbortSignal,
+): Promise<void> {
+  if (MOCK_MODE) {
+    onEvent({ type: "error", error: "الوضع التجريبي — لا يوجد نموذج ذكاء اصطناعي متصل." });
+    return;
+  }
+  const token = getLocalToken();
+  if (!token) throw new ApiError("أدخل رمز الخادم المحلي من الإعدادات أولاً", "http", 401);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/v1/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ content, model, conversationId: "default" }),
+      signal,
+    });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new ApiError("تعذر الوصول إلى Ollama عبر الخادم المحلي", "offline");
+  }
+  if (!response.ok) {
+    let detail = "Chat request failed";
+    try {
+      const body = await response.json() as { error?: string; detail?: string };
+      detail = body.detail ?? body.error ?? detail;
+    } catch { /* response may not be JSON */ }
+    throw new ApiError(detail, "http", response.status);
+  }
+  if (!response.body) throw new ApiError("الخادم لم يرسل بيانات المحادثة", "http");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finished = false;
+  const parseLine = (line: string) => {
+    if (!line.trim()) return;
+    let parsed: ChatStreamEvent;
+    try { parsed = JSON.parse(line) as ChatStreamEvent; }
+    catch { throw new ApiError("بيانات غير صالحة من الخادم المحلي", "http"); }
+    if (parsed.type === "done") finished = true;
+    if (parsed.type === "error") throw new ApiError(parsed.error, "http");
+    onEvent(parsed);
+  };
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      if (buffer.length > 2_000_000) throw new ApiError("استجابة المحادثة أكبر من الحد المسموح", "http");
+      while (buffer.includes("\n")) {
+        const at = buffer.indexOf("\n");
+        const line = buffer.slice(0, at);
+        buffer = buffer.slice(at + 1);
+        parseLine(line);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) parseLine(buffer);
+    if (!finished && !signal.aborted) throw new ApiError("انتهى اتصال المحادثة قبل اكتمال الرد", "http");
+  } finally {
+    reader.releaseLock();
+  }
+}
