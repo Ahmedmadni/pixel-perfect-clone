@@ -62,7 +62,7 @@ export function canSend(state: ControlState, event: ControlEventType) {
 export interface ControlSnapshot {
   state: ControlState;
   reason: string | null;
-  history: { at: string; from: ControlState; to: ControlState; event: ControlEventType }[];
+  history: { at: string; from: ControlState; to: ControlState; event: ControlEventType | "STARTUP_RESET" }[];
 }
 
 export const initialControl: ControlSnapshot = { state: "MANUAL", reason: null, history: [] };
