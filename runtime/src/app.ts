@@ -35,7 +35,7 @@ function tokenOk(header: string | undefined, token: string) {
 export async function buildApp(
   cfg: Pick<Config, "RUNTIME_TOKEN" | "CORS_ORIGINS">,
   store: ControlStore,
-  dependencies?: { ollama?: OllamaClient; chat?: ChatStore },
+  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean },
 ): Promise<FastifyInstance> {
   const startedAt = Date.now();
   const app = Fastify({ logger: false, bodyLimit: 16 * 1024 });
@@ -110,6 +110,9 @@ export async function buildApp(
   app.post("/v1/agent/control", async (req, reply) => {
     const parsed = controlBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_event" });
+    if (["START_AGENT", "APPROVE", "RESUME"].includes(parsed.data.type) && !dependencies?.browserReady?.()) {
+      return reply.code(503).send({ error: "browser_agent_not_ready" });
+    }
     const r = await store.apply(parsed.data, "user");
     if (!r.ok) return reply.code(409).send({ error: "invalid_transition", snapshot: r.snapshot });
     return { ok: true, snapshot: r.snapshot };
