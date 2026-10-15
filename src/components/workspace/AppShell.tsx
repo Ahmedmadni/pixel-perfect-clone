@@ -28,13 +28,14 @@ function ConnectionPill() {
   const q = useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 15000, retry: 0 });
   if (MOCK_MODE) return <Pill tone="warning">وضع تجريبي</Pill>;
   if (q.isPending) return <Pill tone="neutral" dot>جارٍ الاتصال</Pill>;
-  if (q.error) return <Pill tone="danger">غير متصل</Pill>;
-  return <Pill tone="success" dot>متصل محلياً</Pill>;
+  if (q.error) return <Pill tone="danger">الخادم غير متصل</Pill>;
+  if (q.data?.degraded) return <Pill tone="warning">الخادم متاح — قاعدة البيانات غير جاهزة</Pill>;
+  return <Pill tone="success" dot>الخادم المحلي متاح</Pill>;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useI18n();
-  const { snap, send } = useControl();
+  const { snap, send, connected, pending } = useControl();
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-e border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -42,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ShieldCheck className="size-5 text-sidebar-primary" />
           <div>
             <div className="text-sm font-semibold">{t("appName")}</div>
-            <div className="font-mono text-[10px] text-muted-foreground">local-first · phase 1</div>
+            <div className="font-mono text-[10px] text-muted-foreground">local-first · phase 2A</div>
           </div>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
@@ -72,13 +73,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b bg-background/90 px-6 py-3 backdrop-blur">
           <div className="flex items-center gap-3">
-            <ControlBadge state={snap.state} />
+            {connected ? <ControlBadge state={snap.state} /> : <Pill tone="danger">التحكم غير متصل</Pill>}
             <ConnectionPill />
           </div>
           <Button
             variant="destructive"
             size="sm"
-            disabled={snap.state === "STOPPED"}
+            disabled={!connected || pending || snap.state === "STOPPED" || snap.state === "ERROR"}
             onClick={() => send({ type: "EMERGENCY_STOP" })}
           >
             <OctagonX className="size-4" /> {t("emergencyStop")}
