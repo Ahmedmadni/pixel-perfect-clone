@@ -51,7 +51,21 @@ POST /v1/chat/stream uses a validated *installed* model and streams newline-deli
 
 On error it emits `{"type":"error","error":"..."}` when the connection remains writable and records the failed/aborted assistant row. Aborting the client's fetch aborts the upstream Ollama generation. Chat messages are stored in the local `chat_messages` PostgreSQL table (migration 002). Chat history in real mode no longer uses mock responses.
 
-## Phase 2E: supervised read-only page-review tasks (code complete, execution pending)
+## Phase 2F: local notification inbox (implemented in code)
+
+Notifications are privacy-minimal status updates. Migration `005_notifications.sql`
+persists task completion/failure/cancellation notices with task ID and generic Arabic
+status; it does **not** duplicate source page text, reports or account details.
+
+| Method | Endpoint | Request | Response |
+|---|---|---|---|
+| GET | `/v1/notifications?limit=50` | Bearer auth | Most recent local notices and read state |
+| POST | `/v1/notifications/:id/read` | Bearer auth | `{ok:true}` or 404 |
+
+Notifications are created in the same database transaction that marks a task
+complete. Sending through Telegram or WhatsApp is not implemented.
+
+## Phase 2E: supervised read-only page-review tasks (code complete, execution pending
 
 The user selects an already open approved HTTPS tab and installed local Ollama model.
 The service obtains exclusive agent browser ownership, inspects only that tab,
