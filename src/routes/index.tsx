@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
 const svcTone = { up: "success", down: "danger", unknown: "neutral" } as const;
 
 function Overview() {
-  const { snap } = useControl();
+  const { snap, connected } = useControl();
   const health = useQuery({ queryKey: ["health"], queryFn: api.health, retry: 0 });
   const approvals = useQuery({ queryKey: ["approvals"], queryFn: api.approvals });
   const logs = useQuery({ queryKey: ["logs"], queryFn: api.logs });
@@ -26,7 +26,7 @@ function Overview() {
       <div className="grid gap-4 lg:grid-cols-4">
         <Panel className="lg:col-span-1">
           <div className="text-xs text-muted-foreground">وضع التحكم</div>
-          <div className="mt-2"><ControlBadge state={snap.state} /></div>
+          <div className="mt-2">{connected ? <ControlBadge state={snap.state} /> : <Pill tone="danger">حالة التحكم غير متحققة</Pill>}</div>
           {snap.reason && <p className="mt-2 text-xs text-muted-foreground">{snap.reason}</p>}
         </Panel>
         <Panel>
@@ -39,7 +39,7 @@ function Overview() {
         </Panel>
         <Panel>
           <div className="text-xs text-muted-foreground">مصدر البيانات</div>
-          <div className="mt-2">{MOCK_MODE ? <Pill tone="warning">وهمية (Mock)</Pill> : <Pill tone="success">خادم محلي</Pill>}</div>
+          <div className="mt-2">{MOCK_MODE ? <Pill tone="warning">وهمية (Mock)</Pill> : connected ? <Pill tone="success">خادم محلي متحقق</Pill> : <Pill tone="danger">لم يُؤكد الاتصال</Pill>}</div>
         </Panel>
       </div>
 
