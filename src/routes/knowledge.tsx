@@ -7,7 +7,7 @@ export const Route = createFileRoute("/knowledge")({
   head: pageHead("المعرفة والذاكرة", "Create, search, categorize and version personal knowledge and instructions."),
   component: () => (
     <>
-      <PageHeader title="المعرفة والذاكرة" desc="معلوماتك وتعليماتك للوكيل. كل تعديل يحفظ إصداراً جديداً. التخزين محلي في هذا المتصفح (المرحلة 1)." />
+      <PageHeader title="المعرفة والذاكرة" desc="معلوماتك وتعليماتك للوكيل. كل تعديل يحفظ إصداراً جديداً. في الوضع الحقيقي يتم الحفظ في قاعدة بيانات PostgreSQL المحلية مع الاحتفاظ بالإصدارات." />
       <KnowledgeManager categories={["personal", "instruction", "style", "example"]} />
     </>
   ),
