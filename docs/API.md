@@ -64,7 +64,7 @@ Mock mode retains separate localStorage demonstration data; these examples are *
 | POST | `/v1/knowledge/:id/restore` | `{version,expectedVersion}` | Creates new version from an older one |
 | DELETE | `/v1/knowledge/:id` | — | Hard deletion of item and versions |
 
-Database changes use transactions, row locking and audit entries recording item IDs but not personal text. No private information is seeded. This implements permanent storage, **not yet relevant-memory retrieval by the AI agent**.
+Database changes use transactions, row locking and audit entries recording item IDs but not personal text. No private information is seeded. The local Ollama chat now retrieves bounded saved instructions/styles and keyword-matched knowledge, but autonomous tool execution and richer semantic retrieval are **not** implemented or locally tested.
 
 ## Phase 2C browser integration — code present, local verification pending
 
