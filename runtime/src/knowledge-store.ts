@@ -157,8 +157,8 @@ export class PgKnowledgeStore {
    */
   forPrompt(prompt: string, limit = 12): Promise<KnowledgeDraft[]> {
     return this.wrap(async () => {
-      const words = [...new Set(prompt.toLowerCase().match(/[\\p{L}\\p{N}]{3,}/gu) ?? [])].slice(0, 8);
-      const patterns = words.map((w) => "%" + w.replace(/[\\%_]/g, "\\\\$&") + "%");
+      const words = [...new Set(prompt.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [])].slice(0, 8);
+      const patterns = words.map((w) => "%" + w + "%");
       const result = await this.pool.query<KnowledgeDraft>(
         `SELECT category, title, left(body, 1200) AS body, tags
          FROM knowledge_items
