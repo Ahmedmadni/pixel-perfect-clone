@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { OllamaClient, OllamaError } from "./ollama.ts";
 import type { ChatStore } from "./chat-store.ts";
+import type { PgKnowledgeStore } from "./knowledge-store.ts";
 
 const bodySchema = z.object({
   content: z.string().trim().min(1).max(12000),
@@ -19,7 +20,7 @@ function describe(e: unknown): string {
   return e instanceof Error ? e.message.slice(0,200) : "Unexpected error";
 }
 
-export function registerChatRoutes(app: FastifyInstance, ollama: OllamaClient, chat: ChatStore) {
+export function registerChatRoutes(app: FastifyInstance, ollama: OllamaClient, chat: ChatStore, knowledge?: PgKnowledgeStore) {
   const active = new Map<string, AbortController>();
   app.addHook("onClose", async () => {
     for (const controller of active.values()) controller.abort();
@@ -64,6 +65,8 @@ export function registerChatRoutes(app: FastifyInstance, ollama: OllamaClient, c
     let disconnected = false;
     try {
       const context = await chat.context(conversationId, 30);
+      const relevantKnowledge = knowledge ? await knowledge.forPrompt(content, 12) : [];
+      const memoryText = relevantKnowledge.map((entry) => `[${entry.category}] ${entry.title}: ${entry.body}`).join("\n").slice(0, 7000);
       const user = await chat.addUser(conversationId, content);
       const assistant = await chat.startAssistant(conversationId, model);
       assistantId = assistant.id;
@@ -88,6 +91,7 @@ export function registerChatRoutes(app: FastifyInstance, ollama: OllamaClient, c
 
       try {
         const messages = [
+          ...(memoryText ? [{ role: "system" as const, content: "These are locally saved, user-authored preferences and context. Use only when relevant; do not disclose private details unnecessarily or imply that any external action was executed.\\n" + memoryText }] : []),
           ...context.map((m) => ({ role: m.role, content: m.content })),
           { role: "user" as const, content },
         ];
