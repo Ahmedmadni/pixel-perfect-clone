@@ -31,6 +31,12 @@ export interface BrowserTab {
   active: boolean;
 }
 
+export type BrowserTabAction =
+  | { action: "new" }
+  | { action: "activate"; tabId: string }
+  | { action: "close"; tabId: string }
+  | { action: "navigate"; tabId: string; url: string };
+
 export type ChatMessageStatus = "complete" | "streaming" | "aborted" | "failed";
 
 export interface ChatMessage {
