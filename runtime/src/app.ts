@@ -12,9 +12,10 @@ import { BrowserGateway } from "./browser-gateway.ts";
 import { nextState, type ControlEvent } from "../../src/lib/control-machine.ts";
 import { KnowledgeConflictError, KnowledgeNotFoundError, type PgKnowledgeStore } from "./knowledge-store.ts";
 import type { TaskRepository } from "./task-store.ts";
+import type { NotificationRepository } from "./notification-store.ts";
 import { AgentBusyError, AgentNotReadyError, ReadOnlyAgent } from "./read-only-agent.ts";
 
-export const VERSION = "0.4.0-phase2e-readonly";
+export const VERSION = "0.4.1-notifications";
 
 const controlBody = z.discriminatedUnion("type", [
   z.object({ type: z.literal("START_AGENT") }).strict(),
@@ -40,7 +41,7 @@ function tokenOk(header: string | undefined, token: string) {
 export async function buildApp(
   cfg: Pick<Config, "RUNTIME_TOKEN" | "CORS_ORIGINS">,
   store: ControlStore,
-  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway; knowledge?: PgKnowledgeStore; tasks?: TaskRepository },
+  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway; knowledge?: PgKnowledgeStore; tasks?: TaskRepository; notifications?: NotificationRepository },
 ): Promise<FastifyInstance> {
   const startedAt = Date.now();
   let controlQueue: Promise<unknown> = Promise.resolve();
@@ -293,6 +294,22 @@ export async function buildApp(
     const params = uuidParams.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_knowledge_id" });
     return dependencies.knowledge.remove(params.data.id);
+  });
+
+  // Phase 2F: private in-app notifications (no third-party messaging).
+  app.get("/v1/notifications", async (req, reply) => {
+    if (!dependencies?.notifications) return reply.code(503).send({ error: "notifications_not_configured" });
+    const q = z.object({limit: z.coerce.number().int().min(1).max(100).default(50)}).strict().safeParse(req.query);
+    if (!q.success) return reply.code(400).send({ error: "invalid_query" });
+    return dependencies.notifications.list(q.data.limit);
+  });
+  app.post("/v1/notifications/:id/read", async (req, reply) => {
+    if (!dependencies?.notifications) return reply.code(503).send({ error: "notifications_not_configured" });
+    const p = z.object({id: z.string().uuid()}).safeParse(req.params);
+    if (!p.success) return reply.code(400).send({ error: "invalid_notification_id" });
+    const marked = await dependencies.notifications.markRead(p.data.id);
+    if (!marked) return reply.code(404).send({ error: "notification_not_found" });
+    return {ok: true};
   });
 
   app.get("/v1/logs", async (req, reply) => {
