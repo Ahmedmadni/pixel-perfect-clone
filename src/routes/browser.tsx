@@ -31,9 +31,10 @@ function BrowserPage() {
   const [connect, setConnect] = useState(false);
   const s = snap.state;
   const noVncReady = health.data?.services.some((x) => x.name === "novnc" && x.status === "up") ?? false;
-  const agentReady = health.data?.services.some((x) => x.name === "playwright" && x.status === "up") ?? false;
+  const browserReady = health.data?.services.some((x) => x.name === "playwright" && x.status === "up") ?? false;
+  const agentReady = health.data?.services.some((x) => x.name === "agent" && x.status === "up") ?? false;
   const mayAct = MOCK_MODE || (connected && !pending);
-  const mayEditTabs = !MOCK_MODE && connected && !pending && !tabOperation.isPending && s === "MANUAL" && agentReady;
+  const mayEditTabs = !MOCK_MODE && connected && !pending && !tabOperation.isPending && s === "MANUAL" && browserReady;
   const selectedTabId = tabs.data?.find((t) => t.active)?.id ?? tabs.data?.[0]?.id;
   const canConnect = !MOCK_MODE && connected && noVncReady;
   const viewOnly = !connected || pending || s !== "MANUAL";
@@ -48,7 +49,7 @@ function BrowserPage() {
         desc="عرض متصفح Chromium الحقيقي على جهازك عبر noVNC. لا يتم تضمين المواقع عبر iframe عادي."
         actions={
           <>
-            <Button size="sm" disabled={!mayAct || (!MOCK_MODE && (!noVncReady || !agentReady)) || !canSend(s, "START_AGENT")} onClick={() => send({ type: "START_AGENT" })}><Play className="size-4" /> تسليم للوكيل</Button>
+            <Button size="sm" disabled={!mayAct || (!MOCK_MODE && (!noVncReady || !browserReady || !agentReady)) || !canSend(s, "START_AGENT")} onClick={() => send({ type: "START_AGENT" })}><Play className="size-4" /> تسليم للوكيل</Button>
             <Button size="sm" variant="secondary" disabled={!mayAct || !canSend(s, "TAKE_OVER")} onClick={() => send({ type: "TAKE_OVER" })}><Hand className="size-4" /> استلام يدوي</Button>
             <Button size="sm" variant="secondary" disabled={!mayAct || (!canSend(s, "PAUSE") && !canSend(s, "RESUME"))} onClick={() => send({ type: s === "PAUSED" ? "RESUME" : "PAUSE" })}><Pause className="size-4" /> {s === "PAUSED" ? "استئناف" : "إيقاف مؤقت"}</Button>
             <Button size="sm" variant="outline" disabled={!mayAct || !canSend(s, "RESET")} onClick={() => send({ type: "RESET" })}><RotateCcw className="size-4" /> إعادة ضبط</Button>
@@ -133,7 +134,7 @@ function BrowserPage() {
           </Panel>
           {MOCK_MODE && <Pill tone="warning">التبويبات المعروضة وهمية</Pill>}
           {!MOCK_MODE && !noVncReady && <Pill tone="warning">المتصفح الحقيقي غير متحقق بعد</Pill>}
-          {!MOCK_MODE && !agentReady && <Pill tone="neutral">وكيل التصفح لم يتصل بعد</Pill>}
+          {!MOCK_MODE && !agentReady && <Pill tone="neutral">محرك التصفح موجود لكن الوكيل المستقل لم يُفعّل بعد</Pill>}
         </div>
       </div>
     </>
