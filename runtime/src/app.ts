@@ -8,6 +8,8 @@ import type { AgentStatus, HealthResponse } from "../../src/lib/api/types.ts";
 import type { OllamaClient } from "./ollama.ts";
 import type { ChatStore } from "./chat-store.ts";
 import { registerChatRoutes } from "./chat-routes.ts";
+import { BrowserGateway } from "./browser-gateway.ts";
+import { nextState, type ControlEvent } from "../../src/lib/control-machine.ts";
 
 export const VERSION = "0.2.1-phase2b";
 
@@ -35,9 +37,15 @@ function tokenOk(header: string | undefined, token: string) {
 export async function buildApp(
   cfg: Pick<Config, "RUNTIME_TOKEN" | "CORS_ORIGINS">,
   store: ControlStore,
-  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean },
+  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway },
 ): Promise<FastifyInstance> {
   const startedAt = Date.now();
+  let controlQueue: Promise<unknown> = Promise.resolve();
+  function serializeControl<T>(fn: () => Promise<T>): Promise<T> {
+    const next = controlQueue.then(fn);
+    controlQueue = next.catch(() => {});
+    return next;
+  }
   const app = Fastify({ logger: false, bodyLimit: 16 * 1024 });
 
   await app.register(cors, {
@@ -83,21 +91,35 @@ export async function buildApp(
         ollamaHealth = { name: "ollama", status: "down", detail: "local Ollama not reachable" };
       }
     }
+    let browserHealth: { ready: boolean; novnc: boolean } | null = null;
+    if (dependencies?.browser) {
+      try { browserHealth = await dependencies.browser.health(); }
+      catch { browserHealth = { ready: false, novnc: false }; }
+    }
     return {
       version: VERSION,
-      degraded: pg.status !== "up" || ollamaHealth.status === "down",
+      degraded: pg.status !== "up" || ollamaHealth.status === "down" || (dependencies?.browser && !browserHealth?.ready) === true,
       services: [
         { name: "api", status: "up" },
         pg,
         ollamaHealth,
-        { name: "playwright", status: "unknown", detail: notProbed },
-        { name: "novnc", status: "unknown", detail: notProbed },
+        dependencies?.browser ? { name: "playwright", status: browserHealth?.ready ? "up" : "down" } : { name: "playwright", status: "unknown", detail: notProbed },
+        dependencies?.browser ? { name: "novnc", status: browserHealth?.novnc ? "up" : "down" } : { name: "novnc", status: "unknown", detail: notProbed },
       ],
     };
   });
 
   app.get("/v1/agent/status", async (): Promise<AgentStatus> => {
-    const snapshot = await store.getSnapshot();
+    let snapshot = await store.getSnapshot();
+    if (["AGENT_ACTIVE", "APPROVAL_REQUIRED", "PAUSED"].includes(snapshot.state) && dependencies?.browser) {
+      try {
+        const worker = await dependencies.browser.health();
+        if (!worker.ready || worker.mode === "STOPPED") throw new Error("browser worker disconnected");
+      } catch {
+        await store.apply({ type: "FAIL", error: "Browser worker was not reachable; execution stopped" }, "system");
+        snapshot = await store.getSnapshot();
+      }
+    }
     return {
       control: snapshot.state,
       currentTask: null,
@@ -110,12 +132,76 @@ export async function buildApp(
   app.post("/v1/agent/control", async (req, reply) => {
     const parsed = controlBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_event" });
-    if (["START_AGENT", "APPROVE", "RESUME"].includes(parsed.data.type) && !dependencies?.browserReady?.()) {
-      return reply.code(503).send({ error: "browser_agent_not_ready" });
+    const event = parsed.data as ControlEvent;
+    const result = await serializeControl(async () => {
+      const before = await store.getSnapshot();
+      if (!nextState(before.state, event.type)) return { status: 409, body: { error: "invalid_transition", snapshot: before } };
+      const agentStarts = ["START_AGENT", "APPROVE", "RESUME"].includes(event.type);
+      if (agentStarts && !dependencies?.browser && !dependencies?.browserReady?.()) {
+        return { status: 503, body: { error: "browser_agent_not_ready" } };
+      }
+      if (dependencies?.browser) {
+        const target = event.type === "EMERGENCY_STOP" || event.type === "FAIL" ? "STOPPED"
+          : event.type === "PAUSE" || event.type === "REQUEST_APPROVAL" ? "PAUSED"
+          : agentStarts ? "AGENT_ACTIVE" : "MANUAL";
+        try {
+          const health = await dependencies.browser.health();
+          if (!health.ready || (agentStarts && !health.novnc)) throw new Error("browser_agent_not_ready");
+          // Worker starts fail-closed, while the DB can initially say MANUAL.
+          if (target === "AGENT_ACTIVE" && health.mode === "STOPPED" && before.state === "MANUAL") {
+            await dependencies.browser.handoff("MANUAL");
+          }
+          await dependencies.browser.handoff(target);
+        } catch {
+          // Emergency stop MUST still close out the database state if the worker is unreachable.
+          if (event.type !== "EMERGENCY_STOP" && event.type !== "FAIL") {
+            try { await dependencies.browser.handoff("STOPPED"); } catch { /* offline */ }
+            return { status: 503, body: { error: "browser_worker_unavailable" } };
+          }
+        }
+      }
+      try {
+        const transition = await store.apply(event, "user");
+        if (!transition.ok) {
+          if (dependencies?.browser) await dependencies.browser.handoff("STOPPED").catch(() => {});
+          return { status: 409, body: { error: "invalid_transition", snapshot: transition.snapshot } };
+        }
+        return { status: 200, body: { ok: true, snapshot: transition.snapshot } };
+      } catch (error) {
+        if (dependencies?.browser) await dependencies.browser.handoff("STOPPED").catch(() => {});
+        throw error;
+      }
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.get("/v1/browser/tabs", async (_req, reply) => {
+    if (!dependencies?.browser) return reply.code(503).send({ error: "browser_worker_not_configured" });
+    try { return await dependencies.browser.tabs(); }
+    catch { return reply.code(503).send({ error: "browser_worker_unavailable" }); }
+  });
+
+  const tabAction = z.discriminatedUnion("action", [
+    z.object({ action: z.literal("new") }).strict(),
+    z.object({ action: z.literal("activate"), tabId: z.string().uuid() }).strict(),
+    z.object({ action: z.literal("close"), tabId: z.string().uuid() }).strict(),
+    z.object({ action: z.literal("navigate"), tabId: z.string().uuid(), url: z.string().max(2048) }).strict(),
+  ]);
+  app.post("/v1/browser/tabs", async (req, reply) => {
+    if (!dependencies?.browser) return reply.code(503).send({ error: "browser_worker_not_configured" });
+    const parsed = tabAction.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_tab_action" });
+    if ((await store.getSnapshot()).state !== "MANUAL") return reply.code(409).send({ error: "manual_control_required" });
+    try {
+      await dependencies.browser.ensureManual();
+      const action = parsed.data;
+      if (action.action === "new") return await dependencies.browser.newTab();
+      if (action.action === "activate") return await dependencies.browser.activateTab(action.tabId);
+      if (action.action === "close") return await dependencies.browser.closeTab(action.tabId);
+      return await dependencies.browser.navigate(action.tabId, action.url);
+    } catch {
+      return reply.code(503).send({ error: "browser_worker_unavailable_or_busy" });
     }
-    const r = await store.apply(parsed.data, "user");
-    if (!r.ok) return reply.code(409).send({ error: "invalid_transition", snapshot: r.snapshot });
-    return { ok: true, snapshot: r.snapshot };
   });
 
   app.get("/v1/logs", async (req, reply) => {
