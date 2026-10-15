@@ -31,8 +31,8 @@ It **does not** certify PostgreSQL, Ollama, Chromium, a VNC server, WhatsApp, Fa
 ## Next implementation milestones
 
 - **2B:** check GitHub-side Ollama integration, fix type/build/API/streaming issues, run cloud validation, then mark Windows integration pending.
-- **2C:** build visible Chromium/Playwright/noVNC service and session persistence with true server-side manual/agent ownership checks. Do not activate agent mode on an unverified browser.
-- **2D:** migrate knowledge records from browser storage to PostgreSQL.
+- **2C:** Browser worker + Docker Compose + Fastify bridge + tab UI exist in source. Windows tests, sandbox validation and VNC handoff verification remain pending. Autonomous agent mode stays disabled until runner implementation.
+- **2D:** PostgreSQL knowledge tables, versioned CRUD and real-mode UI added; production migrations and opt-in legacy data import remain pending.
 - **2E:** agent task queue, approved tools, and confirmation before external effects.
 - **2F:** verified reporting and notification adapters for authorized platforms.
 
