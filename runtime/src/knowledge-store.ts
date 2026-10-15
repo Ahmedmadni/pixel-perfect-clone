@@ -149,6 +149,30 @@ export class PgKnowledgeStore {
     });
   }
 
+  /**
+   * Simple local retrieval without paid vector search.
+   * Always includes newest user-authored instructions/styles, and adds knowledge
+   * matching up to 8 keywords from the current user request.
+   * Excludes historical versions and enforces strict context-size limits.
+   */
+  forPrompt(prompt: string, limit = 12): Promise<KnowledgeDraft[]> {
+    return this.wrap(async () => {
+      const words = [...new Set(prompt.toLowerCase().match(/[\\p{L}\\p{N}]{3,}/gu) ?? [])].slice(0, 8);
+      const patterns = words.map((w) => "%" + w.replace(/[\\%_]/g, "\\\\$&") + "%");
+      const result = await this.pool.query<KnowledgeDraft>(
+        `SELECT category, title, left(body, 1200) AS body, tags
+         FROM knowledge_items
+         WHERE category IN ('instruction','style')
+            OR (title ILIKE ANY($1::text[]) OR body ILIKE ANY($1::text[]))
+         ORDER BY CASE category WHEN 'instruction' THEN 0 WHEN 'style' THEN 1 ELSE 2 END,
+                  updated_at DESC
+         LIMIT $2`,
+        [patterns, Math.min(20, Math.max(1, limit))],
+      );
+      return result.rows;
+    });
+  }
+
   remove(id: string) {
     return this.wrap(async () => {
       await this.transaction(async (c) => {
