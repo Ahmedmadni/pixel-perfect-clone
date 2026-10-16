@@ -51,6 +51,29 @@ POST /v1/chat/stream uses a validated *installed* model and streams newline-deli
 
 On error it emits `{"type":"error","error":"..."}` when the connection remains writable and records the failed/aborted assistant row. Aborting the client's fetch aborts the upstream Ollama generation. Chat messages are stored in the local `chat_messages` PostgreSQL table (migration 002). Chat history in real mode no longer uses mock responses.
 
+## Domain permissions and human approval drafts
+
+The approval and domain policy services are local, authenticated and fail closed.
+They require migrations `006_approval_queue.sql` and `007_review_permissions.sql`.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/v1/approvals` | List human-readable, expiring approval drafts |
+| POST | `/v1/approvals` | Create `{kind,action,target,preview}` draft, with server-set risk and SHA-256 digest |
+| POST | `/v1/approvals/:id` | Decide `{decision:"approve" or "reject", expectedDigest:"64 hex characters"}` |
+| GET | `/v1/accounts` | List site read permissions; real login session stays "unknown" |
+| POST | `/v1/accounts` | Register a deny-by-default `{domain,label}` |
+| POST | `/v1/accounts/:id/review` | Enable/disable read-only review using `{allow:boolean}` |
+
+Approval contents cannot be changed after creation. Drafts expire after 60 minutes,
+and stale, expired and repeated decisions are rejected. **Approval does not trigger any
+external send, post, click or code modification.** There is no external write dispatcher.
+
+Read permission is denied until the user explicitly enables the registered domain.
+The worker's separate `BROWSER_AGENT_DOMAINS` allowlist is also required;
+revoking a permission cancels active review. Database schema always forces
+`can_external_write=false`. Reading a page does not verify login state.
+
 ## Phase 2F: local notification inbox (implemented in code)
 
 Notifications are privacy-minimal status updates. Migration `005_notifications.sql`
