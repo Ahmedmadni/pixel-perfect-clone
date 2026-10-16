@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   AgentTask,
   ApprovalRequest,
+  ApprovalDraft,
   BrowserAccount,
   BrowserTab,
   ChatMessage,
@@ -101,10 +102,15 @@ export const api = {
   accounts: () => request<BrowserAccount[]>("/v1/accounts", undefined, mock.accounts),
   schedules: () => request<ScheduledTask[]>("/v1/schedules", undefined, mock.schedules),
   approvals: () => request<ApprovalRequest[]>("/v1/approvals", undefined, mock.approvals),
-  decide: (id: string, decision: "approve" | "reject") =>
-    request<{ ok: true }>(`/v1/approvals/${id}`, post({ decision }), () => ({
-      ok: true as const,
-    })),
+  createApprovalDraft: (draft: ApprovalDraft) =>
+    request<ApprovalRequest>("/v1/approvals", post(draft)),
+  decide: (id: string, decision: "approve" | "reject", expectedDigest: string) =>
+    request<ApprovalRequest>(`/v1/approvals/${encodeURIComponent(id)}`,
+      post({ decision, expectedDigest }),
+      () => ({
+        ...mock.approvals().find((item) => item.id === id)!,
+        status: decision === "approve" ? "approved" as const : "rejected" as const,
+      })),
   knowledge: () => request<KnowledgeItem[]>("/v1/knowledge"),
   knowledgeCreate: (draft: Pick<KnowledgeItem, "category" | "title" | "body" | "tags">) =>
     request<KnowledgeItem>("/v1/knowledge", post(draft)),
