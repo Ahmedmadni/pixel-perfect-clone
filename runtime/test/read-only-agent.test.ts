@@ -89,7 +89,7 @@ describe("supervised read-only AI agent", () => {
   it("only reads the approved tab, saves an Arabic report, and returns control", async () => {
     const f = fixtures();
     const task = await f.agent.start({objective:"راجع الصفحة واقترح تقريرًا",tabId,model:"local-model"});
-    expect(task.status).toBe("queued");
+    expect(["queued","running","done"]).toContain(task.status); // execution starts asynchronously; fake repository shares the task object
     await untilDone(f.records);
     expect(f.records[0]?.status).toBe("done");
     expect(f.records[0]?.result).toContain("ملخص محلي");
