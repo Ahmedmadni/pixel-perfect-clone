@@ -44,3 +44,9 @@ dist-ssr
 *.key
 browser-data/
 .browser-profiles/
+
+# User backup artifacts must never enter public source history.
+*.pawbak
+*.pawbak.*
+.pawbackup-*.partial
+local/
