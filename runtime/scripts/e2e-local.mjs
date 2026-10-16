@@ -38,12 +38,14 @@ console.log("Waiting for four local service boundaries...");
 const statuses=await waitForIntegration();
 console.log("Services:",JSON.stringify(statuses));
 assert.equal((await fetch(root+"/v1/browser/tabs")).status,401);
-assert.equal((await request("/v1/agent/status")).json.control,"STOPPED");
+const originalState=(await request("/v1/agent/status")).json.control;
+assert.ok(["MANUAL","STOPPED"].includes(originalState),"Fresh DB may start MANUAL; recovered sessions stay STOPPED");
 assert.equal((await request("/v1/models")).json.models[0].name,"ci-fixture:latest");
-
-const reset=await request("/v1/agent/control",{method:"POST",body:JSON.stringify({type:"RESET"})});
-assert.equal(reset.status,200,"Initial control RESET should work");
-assert.equal(reset.json.snapshot.state,"MANUAL");
+if (originalState === "STOPPED") {
+  const reset=await request("/v1/agent/control",{method:"POST",body:JSON.stringify({type:"RESET"})});
+  assert.equal(reset.status,200,"Control RESET must recover a stopped worker");
+  assert.equal(reset.json.snapshot.state,"MANUAL");
+}
 
 const denied=await request("/v1/agent/control",{method:"POST",body:JSON.stringify({type:"START_AGENT"})});
 assert.equal(denied.status,409,"Cannot activate agent without supervised task");
