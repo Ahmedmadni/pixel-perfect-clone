@@ -7,6 +7,12 @@ on:
       - 'browser-worker/**'
       - 'compose.browser.yml'
       - '.github/workflows/browser-smoke.yml'
+      - 'runtime/src/**'
+      - 'runtime/migrations/**'
+      - 'runtime/scripts/e2e-local.mjs'
+      - 'runtime/test/fixtures/fake-ollama.mjs'
+      - 'runtime/package.json'
+      - 'runtime/package-lock.json'
   workflow_dispatch:
 
 permissions:
