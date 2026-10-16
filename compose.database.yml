@@ -1,0 +1,26 @@
+# Optional local PostgreSQL for Windows/WSL2 without separate DB installation.
+# Start with: docker compose --env-file local/.env -f compose.database.yml up -d
+# local/.env is created by scripts/windows/setup.ps1 and MUST NEVER be committed.
+services:
+  database:
+    image: postgres:16-alpine
+    env_file:
+      - ./local/.env
+    environment:
+      POSTGRES_DB: paw
+      POSTGRES_USER: paw
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - paw_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paw -d paw"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  paw_database:
