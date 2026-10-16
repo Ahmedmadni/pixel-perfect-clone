@@ -57,8 +57,8 @@ export const mock = {
     { id: "s2", title: "نشر تذكير أسبوعي", cron: "0 18 * * 4", enabled: false, nextRunAt: null, requiresApproval: true },
   ],
   approvals: (): ApprovalRequest[] => [
-    { id: "r1", action: "إرسال رسالة", target: "واتساب — أحمد", preview: "شكراً لك، سأراجع الملف وأرد عليك غداً.", risk: "medium", createdAt: ago(5), status: "pending" },
-    { id: "r2", action: "نشر تعليق", target: "فيسبوك — منشور الصفحة", preview: "نسعد بخدمتكم دائماً 🌿", risk: "high", createdAt: ago(42), status: "pending" },
+    { id: "r1", kind: "external_message", action: "إرسال رسالة", target: "واتساب — أحمد", preview: "شكراً لك، سأراجع الملف وأرد عليك غداً.", risk: "medium", createdAt: ago(5), status: "pending" },
+    { id: "r2", kind: "publish_comment", action: "نشر تعليق", target: "فيسبوك — منشور الصفحة", preview: "نسعد بخدمتكم دائماً 🌿", risk: "high", createdAt: ago(42), status: "pending" },
   ],
   logs: (): ActivityLog[] => [
     { id: "l1", at: ago(1), level: "info", actor: "system", message: "تم تحميل الواجهة في الوضع التجريبي" },
