@@ -1,0 +1,98 @@
+# Personal AI Workspace — Windows quick start
+
+**Development works through Lovable + GitHub. These steps are for final testing on
+your own Windows PC; you do NOT need to install anything merely to keep developing.**
+
+## Requirements (free local software)
+
+Install and start:
+- Docker Desktop with WSL2 or a supported Docker Engine with Linux containers. Docker licensing conditions depend on use.
+- Node.js 22+ and Bun (the project uses the Bun lockfile).
+- Ollama for real local AI inference. Choose a model according to hardware: `ollama pull llama3.2` is an example, not mandatory.
+- PowerShell 5.1+.
+
+No paid cloud GPU, cloud database or browser-hosting service is needed.
+You must trust the **local** dashboard at 127.0.0.1; the hosted Lovable preview
+cannot use your private localhost credentials or access your PC browser by itself.
+
+## First run
+
+Open PowerShell in the repository root (clone via GitHub or download the repository ZIP):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\setup.ps1
+```
+
+This runs **once**. It checks for required programs, creates private local files,
+generates three independent secrets (PostgreSQL password, API token, browser-worker
+token) and a separate VNC password, and installs frontend/backend dependencies.
+The setup refuses to overwrite any existing local config, avoiding lost sessions.
+
+Generated files (ignored by Git):
+- `local/.env` — local DB password.
+- `runtime/.env` — local runtime token, PostgreSQL URL and browser-worker token.
+- `browser-worker/.env` — VNC password and browser-worker token, all agent permissions OFF by default.
+- `.env.local` — frontend configured in real mode; it intentionally does NOT contain API tokens.
+
+Start the system:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\start.ps1
+```
+
+The launcher starts local PostgreSQL and Chromium/noVNC containers, checks their
+readiness **with Chromium sandbox enabled**, applies the 7 SQL migrations and
+opens separate PowerShell windows for the API and web UI. It opens
+`http://127.0.0.1:8080` when the processes have been launched.
+
+Find `RUNTIME_TOKEN` inside `runtime/.env` **on your PC** and paste it in
+**الإعدادات → رمز الخادم المحلي**. Do NOT paste that token in this chat, GitHub,
+Lovable's hosted preview or any third-party URL.
+
+Find the noVNC password in `browser-worker/.env` locally if requested.
+Only access the local noVNC page at `http://127.0.0.1:6080/vnc.html`.
+
+## Browser permissions and privacy
+
+The browser uses a Docker volume to keep session profiles across container
+restarts. Browser storage may contain login cookies and is **not automatically
+encrypted at rest**; secure your computer with full-disk encryption, strong login
+and access controls. Do not upload Docker volumes or .env files to GitHub.
+
+By default the agent has no site permissions. If you later opt in to a
+read-only review, you must register and approve the domain in the Accounts
+screen **and** explicitly configure the browser-worker local domain allowlist.
+No auto-publishing, sending, account modification or unrestricted AI browsing
+has been enabled.
+
+The CI test that reports successful Chrome/noVNC startup uses a temporary
+offline-only Chromium configuration because GitHub runner's AppArmor restrictions
+block the production sandbox. **The Windows launcher does NOT use that CI-only
+override.** If the browser fails with `No usable sandbox`, do not disable its
+sandbox for real websites. Configure a supported isolated environment and
+retest before signing into accounts.
+
+## Shutdown without losing data
+
+Close the two PowerShell windows opened by `start.ps1`.
+Optionally stop Docker containers from the repository root:
+
+```powershell
+docker compose --env-file local/.env -f compose.database.yml stop
+docker compose -f compose.browser.yml stop
+```
+
+Stopping containers preserves the PostgreSQL and Chromium volumes. **Do not run
+`docker compose down -v` on your personal installation**, as it deletes their
+volumes and can destroy database records and browser sessions.
+
+## Verification limits
+
+GitHub Actions checks the frontend, runtime, SQL migrations, domain policies and
+a throwaway browser container. The full boundary test uses a **fake local Ollama
+HTTP fixture**, not actual AI inference or real user credentials.
+
+A true production-ready claim still requires successful Windows execution,
+Ollama local model inference, genuine noVNC user input handoff with sandbox on,
+profile persistence across restart, encrypted backups and user-authorized
+integration checks.
