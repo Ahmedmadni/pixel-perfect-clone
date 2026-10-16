@@ -82,6 +82,29 @@ function SettingsPage() {
             ولا تنفذ الاستعادة من المتصفح. النسخة الحالية لا تشمل ملفات جلسة Chromium.
           </p>
         </Panel>
+        <Panel title="النسخ الاحتياطي التلقائي (Windows)">
+          <p className="mb-3 text-xs text-muted-foreground">
+            يمكن تفعيل نسخة PostgreSQL مشفّرة يوميًا أثناء تسجيل دخولك إلى Windows.
+            العبارة السرية تُحمى بحساب Windows عبر DPAPI، ولا تُرسل إلى الخادم أو تُخزّن بالمتصفح.
+            لا توجد جدولة مفعّلة تلقائيًا ولا تُحذف نسخ قديمة آليًا.
+          </p>
+          <p className="text-xs font-medium">تفعيل النسخ اليومي الساعة 03:00:</p>
+          <code dir="ltr" className="my-2 block select-all overflow-x-auto rounded-md bg-muted p-2 text-xs">
+            .\scripts\windows\scheduled-backup.ps1 -Enable -Hour 3 -Minute 0
+          </code>
+          <p className="text-xs font-medium">حالة النسخ:</p>
+          <code dir="ltr" className="my-2 block select-all overflow-x-auto rounded-md bg-muted p-2 text-xs">
+            .\scripts\windows\scheduled-backup.ps1 -Status
+          </code>
+          <p className="text-xs font-medium">إيقاف الجدولة دون حذف النسخ:</p>
+          <code dir="ltr" className="my-2 block select-all overflow-x-auto rounded-md bg-muted p-2 text-xs">
+            .\scripts\windows\scheduled-backup.ps1 -Disable
+          </code>
+          <p className="text-xs text-muted-foreground">
+            هذه الأوامر تُنفذ محليًا في PowerShell من جذر المشروع،
+            ولا تتحكم الصفحة نفسها بمهام Windows. احتفظ بعبارة المرور خارج الجهاز لاستعادة النسخ عند الحاجة.
+          </p>
+        </Panel>
         <Panel title="اللغة">
           <div className="flex gap-2">
             <Button variant={lang === "ar" ? "default" : "secondary"} onClick={() => setLang("ar")}>العربية</Button>
