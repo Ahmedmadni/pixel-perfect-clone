@@ -9,6 +9,7 @@ import { BrowserGateway } from "./browser-gateway.ts";
 import { PgKnowledgeStore } from "./knowledge-store.ts";
 import { PgTaskRepository } from "./task-store.ts";
 import { PgNotificationRepository } from "./notification-store.ts";
+import { PgApprovalRepository } from "./approval-store.ts";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 const cfg = loadConfig();
@@ -21,7 +22,7 @@ const tasks = new PgTaskRepository(pool);
 await chat.recover();
 await tasks.recover(); // Requires migration 002; never silently fall back to in-memory storage.
 const browser = cfg.BROWSER_WORKER_TOKEN.length >= 32 ? new BrowserGateway(cfg.BROWSER_WORKER_URL, cfg.BROWSER_WORKER_TOKEN) : undefined;
-const app = await buildApp(cfg, new PgControlStore(pool), { ollama: new OllamaClient(cfg.OLLAMA_URL), chat, knowledge: new PgKnowledgeStore(pool), tasks, notifications: new PgNotificationRepository(pool), ...(browser ? {browser} : {}) });
+const app = await buildApp(cfg, new PgControlStore(pool), { ollama: new OllamaClient(cfg.OLLAMA_URL), chat, knowledge: new PgKnowledgeStore(pool), tasks, notifications: new PgNotificationRepository(pool), approvals: new PgApprovalRepository(pool), ...(browser ? {browser} : {}) });
 await app.listen({ host: cfg.RUNTIME_HOST, port: cfg.RUNTIME_PORT });
 console.log(`PAW runtime listening on http://${cfg.RUNTIME_HOST}:${cfg.RUNTIME_PORT}`);
 
