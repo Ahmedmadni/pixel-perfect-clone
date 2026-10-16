@@ -91,7 +91,7 @@ function InvokeEncryptedBackup([string]$folder,[Security.SecureString]$secret) {
   $psi.RedirectStandardOutput=$true
   $psi.RedirectStandardError=$true
   $psi.CreateNoWindow=$true
-  $psi.StandardInputEncoding=New-Object System.Text.UTF8Encoding($false)
+  $psi.StandardInputEncoding=(New-Object System.Text.UTF8Encoding($false))
   $process=New-Object System.Diagnostics.Process
   $process.StartInfo=$psi
   $password=ToPlaintext $secret
@@ -174,6 +174,12 @@ if($Enable) {
   }
   if(-not (Test-Path $dest)) {New-Item -ItemType Directory -Force -Path $dest | Out-Null}
   $dest=(Resolve-Path -LiteralPath $dest).Path
+  # Reject any backup directory inside the public checkout, including symlinks.
+  $repoPath=[System.IO.Path]::GetFullPath($root).TrimEnd([char]'\\',[char]'/') + [System.IO.Path]::DirectorySeparatorChar
+  $destPath=[System.IO.Path]::GetFullPath($dest).TrimEnd([char]'\\',[char]'/') + [System.IO.Path]::DirectorySeparatorChar
+  if($destPath.StartsWith($repoPath,[StringComparison]::OrdinalIgnoreCase)) {
+    throw "Backup directory cannot be placed inside the public repository"
+  }
   $minutes=New-TimeSpan -Hours $Hour -Minutes $Minute
   if(-not (Test-Path $stateDir)) {New-Item -ItemType Directory -Path $stateDir -Force | Out-Null}
   Write-Host "This opt-in task runs only while your Windows account is signed in."
