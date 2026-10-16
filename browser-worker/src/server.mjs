@@ -12,6 +12,11 @@ const allowedDomains = (process.env.BROWSER_AGENT_DOMAINS ?? "").split(",").map(
 const port = Number(process.env.BROWSER_WORKER_PORT ?? "4300");
 const display = process.env.DISPLAY ?? ":99";
 const enableReadOnlyAgent = process.env.BROWSER_ENABLE_READONLY_AGENT === "true";
+const trustedCiSmoke = process.env.BROWSER_CI_TRUSTED_SMOKE === "true";
+if (trustedCiSmoke && (enableReadOnlyAgent || allowedDomains.length > 0)) {
+  throw new Error("Trusted CI smoke mode forbids agent use and external domain approvals");
+}
+
 let mode = "STOPPED"; // Fail-closed on every start/restart.
 let generation = 0;
 let context;
@@ -227,8 +232,15 @@ const server = createServer((req, res) => {
 async function start() {
   context = await chromium.launchPersistentContext(profileDir, {
     headless: false, viewport: null, acceptDownloads: false,
-    chromiumSandbox: true, args: ["--disable-dev-shm-usage"],
+    // In production keep Chromium's internal sandbox enabled. The throwaway
+    // GitHub CI smoke session cannot create user namespaces under Ubuntu AppArmor;
+    // ONLY the explicit network-denied CI mode tests VNC/GUI without the sandbox.
+    chromiumSandbox: !trustedCiSmoke, args: ["--disable-dev-shm-usage"],
   });
+  if (trustedCiSmoke) {
+    // CI browser may render about:blank for smoke checks but must not fetch remote websites.
+    await context.route("**/*", (route) => route.abort("blockedbyclient"));
+  }
   context.setDefaultTimeout(10_000);
   context.setDefaultNavigationTimeout(12_000);
   if (!pages().length) await context.newPage();
