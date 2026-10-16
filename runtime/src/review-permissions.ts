@@ -53,23 +53,49 @@ export class PgPermissionRepository implements PermissionRepository {
   create(input: {domain:string; label:string}) {
     return this.execute(async () => {
       const domain=normalizeDomain(input.domain);
-      const duplicate = await this.pool.query<Row>("SELECT id FROM review_permissions WHERE domain=$1",[domain]);
-      if(duplicate.rowCount) throw new PermissionConflictError("domain_already_registered");
-      const rows = await this.pool.query<Row>(
-        "INSERT INTO review_permissions(id,domain,label,can_review) VALUES($1,$2,$3,false) RETURNING id,domain,label,can_review,created_at",
-        [randomUUID(),domain,input.label],
-      );
-      return toRecord(rows.rows[0]!);
+      const client = await this.pool.connect();
+      try {
+        await client.query("BEGIN");
+        const rows = await client.query<Row>(
+          `INSERT INTO review_permissions(id,domain,label,can_review)
+           VALUES($1,$2,$3,false)
+           ON CONFLICT(domain) DO NOTHING
+           RETURNING id,domain,label,can_review,created_at`,
+          [randomUUID(),domain,input.label],
+        );
+        if (!rows.rows[0]) throw new PermissionConflictError("domain_already_registered");
+        await client.query(
+          "INSERT INTO audit_logs(level,actor,message) VALUES('audit','user',$1)",
+          [`Registered restricted review domain policy ${rows.rows[0].id}`],
+        );
+        await client.query("COMMIT");
+        return toRecord(rows.rows[0]);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(()=>{});
+        throw error;
+      } finally { client.release(); }
     });
   }
   setReview(id:string,allowed:boolean) {
     return this.execute(async () => {
-      const r=await this.pool.query<Row>(
-        "UPDATE review_permissions SET can_review=$2,updated_at=now() WHERE id=$1 RETURNING id,domain,label,can_review,created_at",
-        [id,allowed],
-      );
-      if(!r.rows[0]) throw new PermissionNotFoundError("domain_permission_not_found");
-      return toRecord(r.rows[0]);
+      const client = await this.pool.connect();
+      try {
+        await client.query("BEGIN");
+        const r=await client.query<Row>(
+          "UPDATE review_permissions SET can_review=$2,updated_at=now() WHERE id=$1 RETURNING id,domain,label,can_review,created_at",
+          [id,allowed],
+        );
+        if(!r.rows[0]) throw new PermissionNotFoundError("domain_permission_not_found");
+        await client.query(
+          "INSERT INTO audit_logs(level,actor,message) VALUES('audit','user',$1)",
+          [`Domain review ${allowed ? "enabled" : "revoked"} for policy ${id}; write access stays disabled`],
+        );
+        await client.query("COMMIT");
+        return toRecord(r.rows[0]);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(()=>{});
+        throw error;
+      } finally { client.release(); }
     });
   }
   isAllowed(url:string) {
