@@ -1,0 +1,71 @@
+name: Browser Worker Smoke Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'browser-worker/**'
+      - 'compose.browser.yml'
+      - '.github/workflows/browser-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    name: Chromium Playwright noVNC local loopback smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BROWSER_WORKER_TOKEN: "ci-test-only-do-not-reuse-this-secret-0000000000000000"
+      VNC_PASSWORD: "ci-demo1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure throwaway local test credentials
+        run: |
+          {
+            echo "BROWSER_WORKER_TOKEN=$BROWSER_WORKER_TOKEN"
+            echo "VNC_PASSWORD=$VNC_PASSWORD"
+            echo "BROWSER_AGENT_DOMAINS=example.org"
+            echo "BROWSER_ENABLE_READONLY_AGENT=false"
+          } > browser-worker/.env
+          chmod 600 browser-worker/.env
+      - name: Build and launch real browser, VNC and noVNC
+        run: docker compose -f compose.browser.yml up -d --build
+      - name: Wait for actual browser readiness
+        run: |
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-browser-health.json; then
+              if node -e 'const h = require("/tmp/paw-browser-health.json"); process.exit(h.ready && h.novnc && h.mode === "STOPPED" && h.viewOnly ? 0 : 1)'; then
+                ready=1
+                break
+              fi
+            fi
+            sleep 3
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker compose -f compose.browser.yml logs --no-color --tail=100
+            echo "Chromium/noVNC not ready" >&2
+            exit 1
+          fi
+      - name: Check authentication, actual tabs and manual handoff
+        run: |
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:4300/tabs)" = "401"
+          curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/tabs > /tmp/paw-tabs.json
+          node -e 'const tabs = require("/tmp/paw-tabs.json"); if (!Array.isArray(tabs) || !tabs.length) process.exit(1)'
+          curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{"state":"MANUAL"}' http://127.0.0.1:4300/control > /tmp/paw-manual.json
+          node -e 'const h = require("/tmp/paw-manual.json"); process.exit(h.mode === "MANUAL" && !h.viewOnly ? 0 : 1)'
+          curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{"state":"STOPPED"}' http://127.0.0.1:4300/control > /tmp/paw-stopped.json
+          node -e 'const h = require("/tmp/paw-stopped.json"); process.exit(h.mode === "STOPPED" && h.viewOnly ? 0 : 1)'
+      - name: Browser diagnostics on failure
+        if: failure()
+        run: docker compose -f compose.browser.yml logs --no-color --tail=160 || true
+      - name: Tear down throwaway browser and profile
+        if: always()
+        run: |
+          docker compose -f compose.browser.yml down -v || true
+          rm -f browser-worker/.env
