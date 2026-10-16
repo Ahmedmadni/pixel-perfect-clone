@@ -81,6 +81,30 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\diagnose.p
 نجاحهما شغّل `start.ps1` من جذر المشروع. ملفات الإعداد تحتوي أسرار
 المستخدم ولا يجب إرسالها للمطور أو رفعها إلى GitHub.
 
+## تشفير نسخ PostgreSQL واستعادتها
+
+بعد تشغيل النظام تستطيع إنشاء نسخة محلية مشفّرة دون حفظ كلمة مرور في
+الملفات أو إرسالها إلى أي خدمة:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\backup.ps1
+```
+
+النسخة تُحفظ افتراضيًا في `%USERPROFILE%\PAW-Backups` بامتداد
+`.pawbak`، وتتطلب عبارة مرور لا تقل عن 16 حرفًا.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\restore.ps1 -InputPath "D:\PrivateBackups\my-workspace.pawbak"
+```
+
+الاستعادة تتحقق من سلامة النسخة، ثم تنشئ قاعدة منفصلة للاختبار ولا
+تستبدل قاعدة `paw`. في اختبارات GitHub نجح النسخ والاسترجاع باستخدام
+بيانات PostgreSQL تجريبية، وليس بيانات المستخدم الفعلية.
+
+للتفاصيل وحدود الخصوصية اقرأ [دليل النسخ المشفّر](BACKUP_AND_RESTORE.md).
+هذه النسخة تشمل البيانات الموجودة في PostgreSQL فقط ولا تتضمن كوكيز
+المتصفح أو Docker Volumes أو إعدادات Ollama.
+
 ## Browser permissions and privacy
 
 The browser uses a Docker volume to keep session profiles across container
