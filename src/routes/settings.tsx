@@ -105,6 +105,26 @@ function SettingsPage() {
             ولا تتحكم الصفحة نفسها بمهام Windows. احتفظ بعبارة المرور خارج الجهاز لاستعادة النسخ عند الحاجة.
           </p>
         </Panel>
+        <Panel title="أرشيف جلسات Chromium المشفّر">
+          <p className="mb-3 text-xs text-muted-foreground">
+            ملفات Chromium قد تحتوي على كوكيز دخول حساسة، ولذلك لا تدخل ضمن
+            النسخ اليومية التلقائية. يجب إيقاف المتصفح بالكامل قبل إنشاء نسخة
+            مشفّرة يدوية، وتبقى أي استعادة داخل Docker Volume جديد غير مستخدم.
+          </p>
+          <p className="text-xs font-medium">أوقف حاوية المتصفح من PowerShell أولًا:</p>
+          <code dir="ltr" className="my-2 block select-all overflow-x-auto rounded-md bg-muted p-2 text-xs">
+            docker compose -f compose.browser.yml stop browser-worker
+          </code>
+          <p className="text-xs font-medium">ثم أنشئ الأرشيف الخاص:</p>
+          <code dir="ltr" className="my-2 block select-all overflow-x-auto rounded-md bg-muted p-2 text-xs">
+            .\scripts\windows\browser-profile.ps1 -Backup
+          </code>
+          <p className="text-xs text-muted-foreground">
+            لا ترسل ملف .pawprofile أو عبارة المرور إلى GitHub أو Lovable.
+            استعادة الملفات في Volume جديد فقط لا تضمن استمرار تسجيل الدخول
+            على جهاز مختلف.
+          </p>
+        </Panel>
         <Panel title="اللغة">
           <div className="flex gap-2">
             <Button variant={lang === "ar" ? "default" : "secondary"} onClick={() => setLang("ar")}>العربية</Button>
