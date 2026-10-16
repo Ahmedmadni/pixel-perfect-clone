@@ -21,6 +21,7 @@ let mode = "STOPPED"; // Fail-closed on every start/restart.
 let generation = 0;
 let context;
 let activePage = null;
+let ciProfileRecovered = false;
 const ids = new WeakMap();
 let queue = Promise.resolve();
 
@@ -95,7 +96,13 @@ async function tabStates() {
 }
 
 function browserHealth() {
-  return { ready: Boolean(context), mode, viewOnly: mode !== "MANUAL", tabs: context ? pages().length : 0, agentRunnerReady: enableReadOnlyAgent && Boolean(context) && allowedDomains.length > 0 };
+  return {
+    ready: Boolean(context), mode, viewOnly: mode !== "MANUAL",
+    tabs: context ? pages().length : 0,
+    agentRunnerReady: enableReadOnlyAgent && Boolean(context) && allowedDomains.length > 0,
+    // A disposable dummy cookie is exposed as a boolean ONLY to explicitly opted-in offline CI.
+    ...(trustedCiSmoke ? { ciProfileRecovered } : {}),
+  };
 }
 
 async function setMode(target) {
@@ -240,6 +247,19 @@ async function start() {
   if (trustedCiSmoke) {
     // CI browser may render about:blank for smoke checks but must not fetch remote websites.
     await context.route("**/*", (route) => route.abort("blockedbyclient"));
+  }
+  if (trustedCiSmoke) {
+    // Offline profile persistence smoke: use a synthetic .test cookie, never a real login.
+    const domain = "https://paw-profile-smoke.test";
+    const existing = await context.cookies(domain);
+    ciProfileRecovered = existing.some((c) =>
+      c.name === "paw_ci_test_marker" && c.value === "offline-test-data");
+    if (!ciProfileRecovered) {
+      await context.addCookies([{
+        url: domain, name: "paw_ci_test_marker", value: "offline-test-data",
+        sameSite: "Lax", secure: true, httpOnly: true,
+      }]);
+    }
   }
   context.setDefaultTimeout(10_000);
   context.setDefaultNavigationTimeout(12_000);
