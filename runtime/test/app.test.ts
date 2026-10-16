@@ -43,16 +43,18 @@ describe("runtime API", () => {
     expect(r.statusCode).toBe(403);
   });
 
-  it("applies valid transitions and returns 409 for invalid", async () => {
+  it("keeps direct AI activation blocked; reset after emergency stop remains possible", async () => {
     const app = await buildApp(cfg, memStore(), { browserReady: () => true });
     const post = (body: unknown) => app.inject({ method: "POST", url: "/v1/agent/control", headers: auth, payload: body as object });
-    const ok = await post({ type: "START_AGENT" });
-    expect(ok.statusCode).toBe(200);
-    expect(ok.json().snapshot.state).toBe("AGENT_ACTIVE");
-    expect((await post({ type: "EMERGENCY_STOP" })).json().snapshot.state).toBe("STOPPED");
-    const bad = await post({ type: "START_AGENT" });
-    expect(bad.statusCode).toBe(409);
-    expect(bad.json().snapshot.state).toBe("STOPPED");
+    for (const type of ["START_AGENT","APPROVE","RESUME"]) {
+      const denied = await post({type});
+      expect(denied.statusCode).toBe(409);
+    }
+    const stop=await post({type:"EMERGENCY_STOP"});
+    expect(stop.statusCode).toBe(200);
+    expect(stop.json().snapshot.state).toBe("STOPPED");
+    expect((await post({type:"RESET"})).json().snapshot.state).toBe("MANUAL");
+    await app.close();
   });
 
   it("refuses to report agent active before a real browser worker is verified", async () => {
