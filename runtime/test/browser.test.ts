@@ -79,7 +79,7 @@ describe("Phase 2C browser runtime bridge", () => {
       url: "/v1/agent/control", method: "POST", headers: auth,
       payload: { type: "START_AGENT" },
     });
-    expect(result.statusCode).toBe(503);
+    expect(result.statusCode).toBe(409);
     expect((await app.inject({url: "/v1/agent/status", headers: auth})).json().control).toBe("MANUAL");
     await app.close();
   });
