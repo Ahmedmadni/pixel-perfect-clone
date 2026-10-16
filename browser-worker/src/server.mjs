@@ -258,6 +258,8 @@ async function start() {
       await context.addCookies([{
         url: domain, name: "paw_ci_test_marker", value: "offline-test-data",
         sameSite: "Lax", secure: true, httpOnly: true,
+        // Persistent test cookie, not a session-only cookie that browsers discard on exit.
+        expires: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
       }]);
     }
   }
