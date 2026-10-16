@@ -4,6 +4,7 @@ import { ReadOnlyAgent, AgentNotReadyError } from "../src/read-only-agent.ts";
 import type { BrowserGateway, WorkerHealth } from "../src/browser-gateway.ts";
 import type { ControlStore } from "../src/store.ts";
 import type { AgentTaskRecord, TaskRepository, TaskStatus } from "../src/task-store.ts";
+import type { PermissionRepository } from "../src/review-permissions.ts";
 import type { OllamaClient, OllamaChatMessage } from "../src/ollama.ts";
 import { initialControl, nextState, type ControlSnapshot } from "../../src/lib/control-machine.ts";
 
@@ -65,7 +66,8 @@ function fixtures(options: { agentEnabled?: boolean; inspectedText?: string } = 
     list: async () => records,
     recover: async () => {},
   } as TaskRepository;
-  const agent = new ReadOnlyAgent(store,browser,ollama,tasks,async (fn)=>fn());
+  const permissions = { isAllowed: async (url: string) => new URL(url).hostname === "example.org" } as PermissionRepository;
+  const agent = new ReadOnlyAgent(store,browser,ollama,tasks,permissions,async (fn)=>fn());
   return { agent,records,store,health, browser };
 }
 
