@@ -137,6 +137,24 @@ Windows Task Scheduler مع تشفير DPAPI المرتبط بحساب Windows �
 لا يتم نسخ كوكيز Chromium أو مفاتيح الخدمات ولا رفع الملفات تلقائيًا
 إلى السحابة. راجع [الدليل التفصيلي للنسخ المشفر](BACKUP_AND_RESTORE.md).
 
+## نسخة مشفّرة منفصلة لجلسات Chromium (اختيارية)
+
+بسبب حساسية كوكيز تسجيل الدخول، **لا تدخل جلسات Chromium ضمن نسخ
+PostgreSQL اليومية**. أوقف حاوية المتصفح بنفسك أولًا، وبعدها اختر:
+
+```powershell
+docker compose -f compose.browser.yml stop browser-worker
+.\scripts\windows\browser-profile.ps1 -Backup
+```
+
+للتأكد من سلامة الأرشيف فقط استخدم `-Verify -InputPath`،
+وللاستعادة الآمنة إلى Docker Volume جديد **غير متصل بالمتصفح الأساسي**
+استخدم `-Restore -InputPath`. السكربت لا يسمح بنسخ متصفح نشط،
+ولا باستبدال جلساتك الحالية أو رفع الكوكيز إلى GitHub.
+
+انظر [الدليل الأمني المنفصل لجلسات Chromium](CHROMIUM_PROFILE_BACKUPS.md)
+للتفاصيل والتحذيرات.
+
 ## Browser permissions and privacy
 
 The browser uses a Docker volume to keep session profiles across container
