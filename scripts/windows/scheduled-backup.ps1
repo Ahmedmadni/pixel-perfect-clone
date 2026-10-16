@@ -175,8 +175,8 @@ if($Enable) {
   if(-not (Test-Path $dest)) {New-Item -ItemType Directory -Force -Path $dest | Out-Null}
   $dest=(Resolve-Path -LiteralPath $dest).Path
   # Reject any backup directory inside the public checkout, including symlinks.
-  $repoPath=[System.IO.Path]::GetFullPath($root).TrimEnd([char]'\\',[char]'/') + [System.IO.Path]::DirectorySeparatorChar
-  $destPath=[System.IO.Path]::GetFullPath($dest).TrimEnd([char]'\\',[char]'/') + [System.IO.Path]::DirectorySeparatorChar
+  $repoPath=[System.IO.Path]::GetFullPath($root).TrimEnd([char]92,[char]'/') + [System.IO.Path]::DirectorySeparatorChar
+  $destPath=[System.IO.Path]::GetFullPath($dest).TrimEnd([char]92,[char]'/') + [System.IO.Path]::DirectorySeparatorChar
   if($destPath.StartsWith($repoPath,[StringComparison]::OrdinalIgnoreCase)) {
     throw "Backup directory cannot be placed inside the public repository"
   }
@@ -199,6 +199,11 @@ if($Enable) {
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "Offline encrypted PostgreSQL backup; signed-in owner only; no auto deletion" | Out-Null
     Write-Host ("Daily encrypted backup was registered for {0:D2}:{1:D2} while signed in." -f $Hour,$Minute)
   } catch {
+    # Never leave behind a registered task with a missing or partial secret.
+    $partial=Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if($partial -and $partial.Actions[0].Arguments.Contains("scheduled-backup.ps1")) {
+      Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    }
     Remove-Item -LiteralPath $secretFile,$configFile -Force -ErrorAction SilentlyContinue
     throw
   } finally {$secret.Dispose()}
