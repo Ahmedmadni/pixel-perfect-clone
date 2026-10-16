@@ -42,7 +42,7 @@ function ChatPage() {
 
   useEffect(() => {
     const available = models.data?.models ?? [];
-    if (available.length && !available.some((m) => m.name === selected)) setSelected(available[0].name);
+    if (available.length && !available.some((m) => m.name === selected)) setSelected(available[0]!.name);
   }, [models.data, selected]);
 
   useEffect(() => { viewRef.current?.scrollTo({ top: viewRef.current.scrollHeight }); }, [messages]);
