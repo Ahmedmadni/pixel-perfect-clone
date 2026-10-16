@@ -36,6 +36,17 @@ Native Ollama model discovery/streaming client, model picker, live text stream U
 - Agent switches control back to manual when task completes. Fail-closed startup and handoff protections remain.
 - Tests added, not independently executed; real Windows Docker/Ollama/PG verification pending.
 
+### Phase 2E extension — immutable human approvals and domain review permissions
+- `006_approval_queue.sql`: manual review drafts, one-hour expiry, SHA-256 digest, database-enforced immutable content and final decisions.
+- Approving a draft is NOT dispatch authorization; no external message or posting tools are implemented.
+- `007_review_permissions.sql`: every registered website starts without review access; database prohibits enabling external writes.
+- Accounts UI registers websites and toggles read-only review permissions, independently of the browser worker's environment allowlist.
+- Task runner checks per-domain permission before acquiring control and after inspection/redirects, before sharing page text with local Ollama.
+- Changes to read permissions cancel ongoing agent review and are audit logged.
+- Direct START_AGENT, APPROVE, and RESUME HTTP control events are always denied; only a supervised task may acquire AI browser control.
+- Added `runtime/test/approvals.test.ts`, `runtime/test/approval-pg.test.ts`, `runtime/test/permissions.test.ts`, plus updated control and reviewer tests.
+- This extension is source-code complete for review but **not yet tested on Windows or real PostgreSQL**.
+
 ### Phase 2F — local notification inbox foundation
 - `005_notifications.sql`: local task status notices only, no copied page content.
 - Task completion/failure/cancellation writes an event atomically with its status.
@@ -60,9 +71,9 @@ Native Ollama model discovery/streaming client, model picker, live text stream U
 **Do not call this a tested system yet.** The unit tests added after earlier Lovable reports have not been independently run or validated on the owner's PC. Browser Docker image, Linux user namespace/seccomp, actual noVNC mouse ownership and persistent login sessions must be tested locally before declaring operational readiness.
 
 ## Remaining milestones
-1. Run cloud CI/static checks and fix errors before local installation.
+1. Run manual GitHub Actions cloud CI/static checks; fix any typecheck, tests or build failures before local installation.
 2. Windows/WSL2 smoke test of PostgreSQL, Ollama, Docker browser worker, noVNC password and server-side VNC handoff.
-3. Phase 2E extension: test the read-only reviewer end-to-end; then build a user-approved tool/action queue, permissions and explicit confirmation before any external write.
+3. Test approvals and deny-by-default domain policies end-to-end; only then design separate official, user-authorized adapters for any future external actions.
 4. Phase 2F: durable task scheduling and optional free internal/Telegram status alerts with opt-in and no personal page content by default.
 5. User-authorized import/export and encrypted backup of private knowledge and browser profiles.
 6. Audit integrations with official Facebook Pages/Instagram Business/WhatsApp Business APIs before enabling messaging; do not rely on unauthorized personal-account automation.
