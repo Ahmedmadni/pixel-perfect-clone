@@ -18,9 +18,14 @@ https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/38869168507
   including control audit, write-protected approvals, expiring decisions,
   read-only site permissions and task notifications.
 - Browser policy: 3/3 lightweight Node tests passed.
-- A separate **live Chromium/noVNC Docker smoke test** was added via
-  `.github/workflows/browser-smoke.yml` and must be read separately; passing
-  source tests does NOT prove Chromium/VNC is running.
+- Verified **live Chromium + Xvfb + x11vnc/noVNC smoke test** in temporary
+  offline GitHub CI (authentication, actual tabs, manual control and STOPPED
+  handoff): https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/38869903194
+- CI-only browser startup uses an explicit OFFLINE test mode (no approved sites,
+  no agent, no external page fetch) because GitHub's Ubuntu runner blocks
+  Chromium user namespaces through AppArmor. Production `chromiumSandbox:true`
+  remains the default and MUST be tested and properly configured on the
+  user's Windows/WSL2 host before browsing real accounts.
 - User-device Windows/WSL2/actual account sessions/Ollama inference have NOT been tested.
 
 ## Completed as source code, not as production verification
@@ -88,7 +93,7 @@ Native Ollama model discovery/streaming client, model picker, live text stream U
 **The repository now passes cloud tests, including a real PostgreSQL database.** This still does not certify the physical Windows runtime, real browser, VNC handoff or logged-in sessions. Browser Docker image, Linux user namespace/seccomp, actual noVNC mouse ownership and persistent login sessions must be tested locally before declaring operational readiness.
 
 ## Remaining milestones
-1. Maintain passing public CI after every commit; investigate the independent Chromium/noVNC smoke result and fix failures.
+1. Maintain passing public CI after every commit; CI real-browser smoke succeeded in offline test mode, while production sandbox setup remains a device-specific step.
 2. Windows/WSL2 smoke test of PostgreSQL, Ollama, Docker browser worker, noVNC password and server-side VNC handoff.
 3. Test approvals and deny-by-default domain policies end-to-end; only then design separate official, user-authorized adapters for any future external actions.
 4. Phase 2F: durable task scheduling and optional free internal/Telegram status alerts with opt-in and no personal page content by default.
