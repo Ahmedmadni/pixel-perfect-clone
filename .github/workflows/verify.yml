@@ -114,7 +114,7 @@ jobs:
       - name: Parse local Windows scripts without executing them
         shell: pwsh
         run: |
-          $paths = @("scripts/windows/setup.ps1", "scripts/windows/start.ps1", "scripts/windows/diagnose.ps1")
+          $paths = @("scripts/windows/setup.ps1", "scripts/windows/start.ps1", "scripts/windows/diagnose.ps1", "scripts/windows/backup.ps1", "scripts/windows/restore.ps1")
           foreach ($path in $paths) {
             $tokens = $null
             $parseErrors = $null
@@ -135,3 +135,66 @@ jobs:
           echo "POSTGRES_PASSWORD=ci-only-compose-parser" > local/.env
           docker compose --env-file local/.env -f compose.database.yml config --quiet
           rm -f local/.env
+
+  encrypted-backup-roundtrip:
+    name: Encrypted PostgreSQL backup and non-destructive restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: runtime/package-lock.json
+      - name: Test portable encryption, tamper detection and password failures
+        run: node --test scripts/backup/crypto.test.mjs
+      - name: Start isolated local PostgreSQL container
+        run: |
+          mkdir -p local
+          echo 'POSTGRES_PASSWORD=ci-throwaway-db' > local/.env
+          docker compose --env-file local/.env -f compose.database.yml up -d
+          for i in $(seq 1 40); do
+            if docker compose --env-file local/.env -f compose.database.yml exec -T database pg_isready -U paw -d paw; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+      - name: Apply migrations and create harmless canary data
+        run: |
+          cd runtime
+          npm ci
+          DATABASE_URL=postgres://paw:ci-throwaway-db@127.0.0.1:5432/paw npm run migrate
+          cd ..
+          docker compose --env-file local/.env -f compose.database.yml exec -T database \
+            psql -U paw -d paw -v ON_ERROR_STOP=1 -c \
+            "INSERT INTO knowledge_items(id,category,title,body,tags) VALUES('11111111-2222-4333-8444-555555555555','style','CI test','ci-private-canary',ARRAY['test']);"
+      - name: Create encrypted backup and restore into a fresh database
+        run: |
+          printf '%s\n' 'CI test passphrase is not a real user secret 2026!' | \
+            node scripts/backup/db-backup.mjs backup --output /tmp/paw-test.pawbak
+          if printf '%s\n' 'Wrong passphrase for CI testing 2026!' | \
+            node scripts/backup/db-backup.mjs restore --input /tmp/paw-test.pawbak --database paw_restore_ci_wrong; then
+            echo 'Wrong password unexpectedly worked' >&2
+            exit 1
+          fi
+          printf '%s\n' 'CI test passphrase is not a real user secret 2026!' | \
+            node scripts/backup/db-backup.mjs restore --input /tmp/paw-test.pawbak --database paw_restore_ci_valid
+          restored="$(docker compose --env-file local/.env -f compose.database.yml exec -T database \
+            psql -U paw -d paw_restore_ci_valid -At -c \
+            "SELECT body FROM knowledge_items WHERE id='11111111-2222-4333-8444-555555555555'")"
+          test "$restored" = "ci-private-canary"
+          original="$(docker compose --env-file local/.env -f compose.database.yml exec -T database \
+            psql -U paw -d paw -At -c \
+            "SELECT body FROM knowledge_items WHERE id='11111111-2222-4333-8444-555555555555'")"
+          test "$original" = "ci-private-canary"
+          wrong_db="$(docker compose --env-file local/.env -f compose.database.yml exec -T database \
+            psql -U paw -d postgres -At -c "SELECT 1 FROM pg_database WHERE datname='paw_restore_ci_wrong'")"
+          test -z "$wrong_db"
+          echo 'PASS: authenticated backup, wrong password refusal, isolated restore, canary match, original untouched'
+      - name: Destroy throwaway backups and DB only
+        if: always()
+        run: |
+          docker compose --env-file local/.env -f compose.database.yml down -v || true
+          rm -f /tmp/paw-test.pawbak local/.env
