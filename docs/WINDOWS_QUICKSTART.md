@@ -60,6 +60,16 @@ Only access the local noVNC page at `http://127.0.0.1:6080/vnc.html`.
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\diagnose.ps1
 ```
 
+لو عايز فحص استدلال حقيقي باستخدام أول نموذج مثبت عندك، نفّذ الاختيار
+التالي (يعمل على الكمبيوتر فقط ولا يرسل المحتوى لخدمة خارجية):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\diagnose.ps1 -TestInference
+```
+
+الفحص يطلب من Ollama محليًا ردًا قصيرًا، ويتحقق من اكتماله، لكن
+لا يطبع النص الناتج. قد يحتاج بعض الوقت وفقًا لقدرة جهازك.
+
 الفحص يعرض إذا كانت قاعدة PostgreSQL وFastify وChromium وnoVNC وOllama
 موجودة وتستجيب، ولا يغيّر حالة التحكم أو يسحب أي معلومات من الحسابات،
 ولا يطبع كلمات المرور أو رموز الوصول. يظل تشغيل Ollama بنموذج حقيقي
