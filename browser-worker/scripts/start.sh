@@ -7,6 +7,14 @@ set -eu
 x11vnc -storepasswd "$VNC_PASSWORD" /tmp/paw-vnc.pass >/dev/null
 chmod 600 /tmp/paw-vnc.pass
 
+# Docker restart preserves container /tmp, including abandoned Xvfb lock/socket
+# files. A running X server must NEVER be overridden; only remove leftover
+# files after verifying that this private container has no live display.
+if xdpyinfo -display :99 >/dev/null 2>&1; then
+  echo "Refusing to start a second Xvfb on live display :99" >&2
+  exit 1
+fi
+rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
 Xvfb :99 -screen 0 1440x900x24 -ac -nolisten tcp &
 tries=0
 until xdpyinfo -display :99 >/dev/null 2>&1; do
