@@ -4,7 +4,7 @@
   database, permissions, sessions or user profiles. Never prints secrets.
 #>
 [CmdletBinding()]
-param()
+param([switch]$TestInference)
 $ErrorActionPreference = "Stop"
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $runtimeConfig = Join-Path $root "runtime\.env"
@@ -71,9 +71,24 @@ if($workerToken.Length -ge 32) {
 }
 try {
   $models=Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 5
-  Check "Real Ollama" ($null -ne $models.models -and @($models.models).Count -gt 0) (
-    "installed models: "+@($models.models).Count
-  )
+  $installed = @($models.models)
+  Check "Real Ollama" ($installed.Count -gt 0) ("installed models: "+$installed.Count)
+  if($TestInference -and $installed.Count -gt 0) {
+    $chosen = $installed[0].name
+    Write-Host "Testing one short REAL local Ollama inference (this can take time on CPU)..."
+    try {
+      $request = @{
+        model = $chosen
+        stream = $false
+        messages = @(@{role = "user";content = "اكتب كلمة واحدة بالعربية: مرحبا"})
+        options = @{num_predict = 24}
+      } | ConvertTo-Json -Depth 5
+      $answer=Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11434/api/chat" -ContentType "application/json" -Body $request -TimeoutSec 120
+      Check "Ollama inference" ([bool]$answer.done -and [bool]$answer.message.content) ("model response received locally; content not printed")
+    } catch {
+      Check "Ollama inference" $false "model timed out, failed to load, or did not finish"
+    }
+  }
 } catch {
   Check "Real Ollama" $false "not running; install Ollama and pull a supported model"
 }
