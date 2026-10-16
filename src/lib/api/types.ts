@@ -86,6 +86,9 @@ export interface KnowledgeItem {
 
 export interface BrowserAccount {
   id: string;
+  domain?: string;
+  canReview?: boolean;
+  canExternalWrite?: false;
   platform: "facebook" | "whatsapp" | "instagram" | "other";
   label: string;
   profileId: string;
