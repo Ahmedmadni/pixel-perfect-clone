@@ -14,9 +14,10 @@ import { KnowledgeConflictError, KnowledgeNotFoundError, type PgKnowledgeStore }
 import type { TaskRepository } from "./task-store.ts";
 import type { NotificationRepository } from "./notification-store.ts";
 import { ApprovalConflictError, ApprovalNotFoundError, type ApprovalRepository } from "./approval-store.ts";
+import { PermissionConflictError, PermissionNotFoundError, type PermissionRepository } from "./review-permissions.ts";
 import { AgentBusyError, AgentNotReadyError, ReadOnlyAgent } from "./read-only-agent.ts";
 
-export const VERSION = "0.4.2-approval-drafts";
+export const VERSION = "0.4.3-review-permissions";
 
 const controlBody = z.discriminatedUnion("type", [
   z.object({ type: z.literal("START_AGENT") }).strict(),
@@ -42,7 +43,7 @@ function tokenOk(header: string | undefined, token: string) {
 export async function buildApp(
   cfg: Pick<Config, "RUNTIME_TOKEN" | "CORS_ORIGINS">,
   store: ControlStore,
-  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway; knowledge?: PgKnowledgeStore; tasks?: TaskRepository; notifications?: NotificationRepository; approvals?: ApprovalRepository },
+  dependencies?: { ollama?: OllamaClient; chat?: ChatStore; browserReady?: () => boolean; browser?: BrowserGateway; knowledge?: PgKnowledgeStore; tasks?: TaskRepository; notifications?: NotificationRepository; approvals?: ApprovalRepository; permissions?: PermissionRepository },
 ): Promise<FastifyInstance> {
   const startedAt = Date.now();
   let controlQueue: Promise<unknown> = Promise.resolve();
@@ -51,8 +52,8 @@ export async function buildApp(
     controlQueue = next.catch(() => {});
     return next;
   }
-  const agent = dependencies?.browser && dependencies.ollama && dependencies.tasks
-    ? new ReadOnlyAgent(store, dependencies.browser, dependencies.ollama, dependencies.tasks, serializeControl)
+  const agent = dependencies?.browser && dependencies.ollama && dependencies.tasks && dependencies.permissions
+    ? new ReadOnlyAgent(store, dependencies.browser, dependencies.ollama, dependencies.tasks, dependencies.permissions, serializeControl)
     : null;
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
 
@@ -75,6 +76,8 @@ export async function buildApp(
   });
 
   app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof PermissionNotFoundError) return reply.code(404).send({error:"permission_not_found"});
+    if (err instanceof PermissionConflictError) return reply.code(409).send({error:"invalid_permission",detail:err.message});
     if (err instanceof ApprovalNotFoundError) return reply.code(404).send({ error: "approval_not_found" });
     if (err instanceof ApprovalConflictError) return reply.code(409).send({ error: "approval_conflict", detail: err.message });
     if (err instanceof AgentBusyError) return reply.code(409).send({ error: "agent_busy", detail: err.message });
@@ -299,6 +302,39 @@ export async function buildApp(
     const params = uuidParams.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_knowledge_id" });
     return dependencies.knowledge.remove(params.data.id);
+  });
+
+  // Domain authorization is independent from the worker allowlist.
+  // Each new domain defaults to no review and no external writes.
+  app.get("/v1/accounts", async (_req, reply) => {
+    if (!dependencies?.permissions) return reply.code(503).send({error:"permissions_not_configured"});
+    const rows = await dependencies.permissions.list();
+    return rows.map((p) => ({
+      id: p.id, domain: p.domain, platform: "other", label: p.label,
+      profileId: "local-default", session: "unknown", lastCheckedAt: null,
+      canReview: p.canReview, canAgentControl: false, canExternalWrite: false,
+    }));
+  });
+  app.post("/v1/accounts", async (req, reply) => {
+    if (!dependencies?.permissions) return reply.code(503).send({error:"permissions_not_configured"});
+    const input = z.object({
+      domain: z.string().trim().min(4).max(253),
+      label: z.string().trim().min(1).max(120),
+    }).strict().safeParse(req.body);
+    if (!input.success) return reply.code(400).send({error:"invalid_domain_registration"});
+    return reply.code(201).send(await dependencies.permissions.create(input.data));
+  });
+  app.post("/v1/accounts/:id/review", async (req, reply) => {
+    if (!dependencies?.permissions) return reply.code(503).send({error:"permissions_not_configured"});
+    const params = z.object({id:z.string().uuid()}).strict().safeParse(req.params);
+    const body = z.object({allow:z.boolean()}).strict().safeParse(req.body);
+    if (!params.success || !body.success) return reply.code(400).send({error:"invalid_review_permission"});
+    return serializeControl(async () => {
+      const updated = await dependencies.permissions!.setReview(params.data.id, body.data.allow);
+      // Any permission change immediately cancels an active task, including stale access.
+      agent?.cancelActive();
+      return updated;
+    });
   });
 
   // Phase 2E: draft approvals are review decisions ONLY. No external dispatcher exists.
