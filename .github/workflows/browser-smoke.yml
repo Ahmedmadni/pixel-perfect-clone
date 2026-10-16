@@ -110,6 +110,26 @@ jobs:
           echo $! > /tmp/paw-runtime.pid
       - name: Verify combined Fastify / PostgreSQL / Chromium / noVNC / fake Ollama
         run: node runtime/scripts/e2e-local.mjs
+      - name: Verify disposable Chromium profile survives a container restart
+        run: |
+          curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-profile-before.json
+          node -e 'const h = require("/tmp/paw-profile-before.json"); if (h.ciProfileRecovered !== false) process.exit(1)'
+          docker compose -f compose.browser.yml restart browser-worker
+          ready=0
+          for i in $(seq 1 40); do
+            if curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-profile-after.json; then
+              if node -e 'const h = require("/tmp/paw-profile-after.json"); process.exit(h.ciProfileRecovered === true && h.mode === "STOPPED" && h.viewOnly && h.ready && h.novnc ? 0 : 1)'; then
+                ready=1
+                break
+              fi
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker compose -f compose.browser.yml logs --no-color --tail=120
+            echo "Profile cookie was not recovered safely after restart" >&2
+            exit 1
+          fi
       - name: Browser diagnostics on failure
         if: failure()
         run: |
