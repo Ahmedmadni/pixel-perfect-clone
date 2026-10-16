@@ -65,4 +65,17 @@ describe("PAW portable encrypted local backups",()=>{
       await assert.rejects(stat(join(dir,"encrypted")),{code:"ENOENT"});
     });
   });
+  it("separates browser cookie archives from database archives cryptographically",async()=>{
+    await fixture(async(dir)=>{
+      const src=join(dir,"dummy-profile.tar"), backup=join(dir,"dummy.pawprofile"), output=join(dir,"decoded.tar");
+      await writeFile(src,Buffer.from("FAKE browser data ONLY - never user cookies"));
+      await encryptStream(createReadStream(src),backup,pw,"browser-profile");
+      assert.equal(await verifyEncryptedFile(backup,pw,"browser-profile"),true);
+      await assert.rejects(verifyEncryptedFile(backup,pw,"database"),/Unsupported|damaged/);
+      await assert.rejects(decryptToFile(backup,output,pw,"database"),/Unsupported|damaged/);
+      await decryptToFile(backup,output,pw,"browser-profile");
+      assert.deepEqual(await readFile(output),await readFile(src));
+    });
+  });
+
 });
