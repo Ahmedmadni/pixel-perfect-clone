@@ -91,7 +91,7 @@ describe("Phase 2E read-only review HTTP API", () => {
   });
   it("rejects bare START_AGENT without a supervised task",async ()=>{
     const f=fake();
-    const app=await buildApp(config,f.store,{browser:f.browser,ollama:f.ollama,tasks:f.tasks});
+    const app=await buildApp(config,f.store,{browser:f.browser,ollama:f.ollama,tasks:f.tasks,permissions:f.permissions});
     const r=await app.inject({url:"/v1/agent/control",method:"POST",headers,payload:{type:"START_AGENT"}});
     expect(r.statusCode).toBe(409);
     expect((await app.inject({url:"/v1/agent/status",headers})).json().control).toBe("MANUAL");
@@ -99,7 +99,7 @@ describe("Phase 2E read-only review HTTP API", () => {
   });
   it("creates a read-only task, saves the report, and returns manual control", async () => {
     const f=fake();
-    const app=await buildApp(config,f.store,{browser:f.browser,ollama:f.ollama,tasks:f.tasks});
+    const app=await buildApp(config,f.store,{browser:f.browser,ollama:f.ollama,tasks:f.tasks,permissions:f.permissions});
     const r=await app.inject({url:"/v1/tasks",method:"POST",headers,payload:{
       objective:"راجع الصفحة واقترح ردودًا دون النشر",tabId,model:"local:latest",
     }});
