@@ -44,6 +44,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\start.ps1
 **لم تُجرّب هاتان الخطوتان على جهاز Windows الحقيقي بعد**؛ سلوكهما يُراجع
 حاليًا بواسطة فحوص صياغة PowerShell وDocker Compose السحابية.
 
+## النسخ الاحتياطي
+
+أُضيف مسار نسخ احتياطي **مشفّر AES-256-GCM** لقاعدة PostgreSQL،
+باستخدام كلمة مرور يُدخلها المستخدم محليًا. النسخة لا تُحفظ في
+GitHub، والاستعادة تتم في قاعدة جديدة حتى لا تُمس البيانات الأصلية.
+
+- [دليل النسخ المشفر والاستعادة](docs/BACKUP_AND_RESTORE.md)
+- [أوامر تشغيل Windows](docs/WINDOWS_QUICKSTART.md)
+- [اختبار التشفير ونسخ/استرجاع PostgreSQL الحقيقي على GitHub](https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/38883955794)
+
+لا يشمل هذا الأرشيف كوكيز المتصفح أو ملفات `.env` أو نماذج Ollama،
+ولا يوجد حتى الآن جدولة تلقائية للنسخ أو واجهة HTTP تستقبل كلمة المرور.
+
 ## الخصوصية والأمان
 
 - لا تُضع رمز `RUNTIME_TOKEN` أو ملفات `.env` أو كوكيز المتصفح على GitHub أو Lovable.
