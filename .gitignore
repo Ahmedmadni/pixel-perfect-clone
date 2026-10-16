@@ -50,3 +50,8 @@ browser-data/
 *.pawbak.*
 .pawbackup-*.partial
 local/
+
+# Sensitive Chromium session archives: may contain live login cookies.
+*.pawprofile
+*.pawprofile.*
+.paw-profile-*.partial
