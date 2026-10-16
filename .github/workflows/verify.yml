@@ -104,3 +104,34 @@ jobs:
           DATABASE_URL="$TEST_DATABASE_URL" npm run migrate
       - name: Execute real database and other runtime tests sequentially
         run: npm test -- --maxWorkers=1 --minWorkers=1
+  
+  windows-script-static:
+    name: Windows PowerShell and Docker Compose syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse local Windows scripts without executing them
+        shell: pwsh
+        run: |
+          $paths = @("scripts/windows/setup.ps1", "scripts/windows/start.ps1")
+          foreach ($path in $paths) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path).Path,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              throw "Invalid PowerShell syntax: $path"
+            }
+            Write-Host "Valid syntax: $path"
+          }
+      - name: Validate local database Compose config with throwaway env
+        run: |
+          mkdir -p local
+          echo "POSTGRES_PASSWORD=ci-only-compose-parser" > local/.env
+          docker compose --env-file local/.env -f compose.database.yml config --quiet
+          rm -f local/.env
