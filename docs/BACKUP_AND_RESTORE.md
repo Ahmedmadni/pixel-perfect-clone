@@ -29,6 +29,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\backup.ps1
 لا يسمح البرنامج بحفظ النسخة داخل مستودع GitHub أو استبدال ملف
 `.pawbak` موجود بالفعل، وتُحذف الملفات الجزئية إذا فشلت العملية.
 
+## التأكد من صلاحية النسخة دون استعادة
+
+يمكن فحص كلمة المرور وملف `.pawbak` المشفر بالكامل **دون إنشاء قاعدة
+بيانات ودون كتابة أي محتوى غير مشفر على القرص**:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\restore.ps1 -InputPath "D:\PrivateBackups\my-workspace.pawbak" -VerifyOnly
+```
+
+يقرأ الفحص النسخة ويتحقق من بصمة AES‑GCM، ويرفض كلمة المرور الخاطئة أو
+أي تلف في البيانات دون استرجاعها. ويعيد أيضًا فحص النسخة فور إنشائها
+قبل اعتماد الملف النهائي.
+
 ## اختبار الاستعادة دون المساس ببياناتك
 
 ```powershell
