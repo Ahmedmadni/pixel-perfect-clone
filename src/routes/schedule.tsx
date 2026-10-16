@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api/client";
+import { api, MOCK_MODE } from "@/lib/api/client";
 import { pageHead } from "@/lib/seo";
 import { Switch } from "@/components/ui/switch";
 import { PageHeader, Panel, Pill, QueryState, fmtTime } from "@/components/workspace/ui-bits";
@@ -14,7 +14,8 @@ function SchedulePage() {
   const q = useQuery({ queryKey: ["schedules"], queryFn: api.schedules });
   return (
     <>
-      <PageHeader title="المهام المجدولة" desc="مهام متكررة ينفذها الوكيل على جهازك وفق جدول." />
+      <PageHeader title="المهام المجدولة" desc={MOCK_MODE ? "عرض تصميم الجدولة ببيانات تجريبية فقط؛ لا تعمل أي مهمة تلقائيًا." : "عرض المهام المجدولة من الخادم المحلي؛ تفعيل الجدولة غير متاح من هذه الشاشة."} />
+      {MOCK_MODE && <p role="status" className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">جميع المهام والتواريخ الظاهرة أمثلة للمعاينة فقط، حتى لو ظهرت علامة التفعيل.</p>}
       <div className="grid gap-3 md:grid-cols-2">
         <QueryState q={q}>
           {(ss) => ss.map((s) => (
