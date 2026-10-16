@@ -11,6 +11,7 @@ import { PgTaskRepository } from "./task-store.ts";
 import { PgNotificationRepository } from "./notification-store.ts";
 import { PgApprovalRepository } from "./approval-store.ts";
 import { PgPermissionRepository } from "./review-permissions.ts";
+import { establishSafeBrowserStartup } from "./startup-safety.ts";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 const cfg = loadConfig();
@@ -21,9 +22,22 @@ pool.on("error", (e) => console.error("[pg] idle client error:", e.message));
 const chat = new PgChatStore(pool);
 const tasks = new PgTaskRepository(pool);
 await chat.recover();
-await tasks.recover(); // Requires migration 002; never silently fall back to in-memory storage.
-const browser = cfg.BROWSER_WORKER_TOKEN.length >= 32 ? new BrowserGateway(cfg.BROWSER_WORKER_URL, cfg.BROWSER_WORKER_TOKEN) : undefined;
-const app = await buildApp(cfg, new PgControlStore(pool), { ollama: new OllamaClient(cfg.OLLAMA_URL), chat, knowledge: new PgKnowledgeStore(pool), tasks, notifications: new PgNotificationRepository(pool), approvals: new PgApprovalRepository(pool), permissions: new PgPermissionRepository(pool), ...(browser ? {browser} : {}) });
+await tasks.recover();
+const control = new PgControlStore(pool);
+await control.getSnapshot(); // Recover any abandoned AGENT_ACTIVE/PAUSED session before listening.
+let browser: BrowserGateway | undefined;
+if (cfg.BROWSER_WORKER_TOKEN.length >= 32) {
+  try {
+    const candidate = new BrowserGateway(cfg.BROWSER_WORKER_URL, cfg.BROWSER_WORKER_TOKEN);
+    await establishSafeBrowserStartup(control, candidate);
+    browser = candidate;
+  } catch (error) {
+    // Fail closed: do not make a previously-controlled worker accessible through this API.
+    // Ollama chat and local knowledge may still run without browser control.
+    console.warn("[browser] ownership reset not verified; browser API disabled until runtime restart:", (error as Error).message);
+  }
+}
+const app = await buildApp(cfg, control, { ollama: new OllamaClient(cfg.OLLAMA_URL), chat, knowledge: new PgKnowledgeStore(pool), tasks, notifications: new PgNotificationRepository(pool), approvals: new PgApprovalRepository(pool), permissions: new PgPermissionRepository(pool), ...(browser ? {browser} : {}) });
 await app.listen({ host: cfg.RUNTIME_HOST, port: cfg.RUNTIME_PORT });
 console.log(`PAW runtime listening on http://${cfg.RUNTIME_HOST}:${cfg.RUNTIME_PORT}`);
 
