@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { createReadStream, createWriteStream } from "node:fs";
 import { open, stat, appendFile, rm } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
+import { Writable } from "node:stream";
 
 const scrypt = promisify(scryptCb);
 const MAGIC = Buffer.from("PAWBK001", "ascii");
@@ -79,4 +80,39 @@ export async function decryptToFile(source, destination, password) {
   } finally {
     key.fill(0);
   }
+}
+
+/**
+ * Authenticates the entire encrypted archive WITHOUT creating plaintext files
+ * or writing decrypted bytes to a database. Useful for periodic backup checks.
+ */
+export async function verifyEncryptedFile(source, password) {
+  const details=await stat(source);
+  if(!details.isFile() || details.size < HEADER_BYTES + TAG_BYTES + 1) {
+    throw new Error("Invalid or incomplete PAW encrypted backup");
+  }
+  const file=await open(source,"r");
+  const header=Buffer.alloc(HEADER_BYTES);
+  const tag=Buffer.alloc(TAG_BYTES);
+  try {
+    if((await file.read(header,0,HEADER_BYTES,0)).bytesRead !== HEADER_BYTES ||
+       !header.subarray(0,MAGIC.length).equals(MAGIC) ||
+       (await file.read(tag,0,TAG_BYTES,details.size-TAG_BYTES)).bytesRead !== TAG_BYTES) {
+      throw new Error("Unsupported or damaged PAW encrypted backup");
+    }
+  } finally {await file.close();}
+  const key=await keyFor(password,header.subarray(MAGIC.length,MAGIC.length+SALT_BYTES));
+  const decipher=createDecipheriv("aes-256-gcm",key,header.subarray(MAGIC.length+SALT_BYTES));
+  decipher.setAAD(header);
+  decipher.setAuthTag(tag);
+  try {
+    await pipeline(
+      createReadStream(source,{start:HEADER_BYTES,end:details.size-TAG_BYTES-1}),
+      decipher,
+      new Writable({write(_chunk,_encoding,callback){callback();}}),
+    );
+    return true;
+  } catch {
+    throw new Error("Backup password was incorrect or encrypted file is damaged");
+  } finally {key.fill(0);}
 }
