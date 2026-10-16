@@ -4,6 +4,7 @@
  * UI labels them as mock data. Mock mode is never presented as a real integration.
  */
 import { mock } from "./mock";
+import { isLocalBrowserOrigin } from "./origin";
 import type {
   ActivityLog,
   AgentStatus,
@@ -38,13 +39,13 @@ export class ApiError extends Error {
 }
 
 export function getLocalToken() {
-  if (typeof window === "undefined") return null;
+  if (!isLocalBrowserOrigin()) return null;
   return window.sessionStorage.getItem("paw.token");
 }
 
 /** Session-only storage: closing this browser session clears the local API secret. */
 export function setLocalToken(value: string) {
-  if (typeof window === "undefined") return;
+  if (!isLocalBrowserOrigin()) return;
   if (value.trim()) window.sessionStorage.setItem("paw.token", value.trim());
   else window.sessionStorage.removeItem("paw.token");
 }
@@ -54,6 +55,9 @@ async function request<T>(path: string, init?: RequestInit, mockFn?: () => T): P
     if (!mockFn) throw new ApiError("Not available in mock mode", "http", 501);
     await new Promise((r) => setTimeout(r, 250));
     return structuredClone(mockFn());
+  }
+  if (!isLocalBrowserOrigin()) {
+    throw new ApiError("المعاينة السحابية لا تتصل بخادم الكمبيوتر المحلي. افتح النسخة المحلية للاستخدام الحقيقي.", "http", 403);
   }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -142,6 +146,9 @@ async function streamLocalChat(
   if (MOCK_MODE) {
     onEvent({ type: "error", error: "الوضع التجريبي — لا يوجد نموذج ذكاء اصطناعي متصل." });
     return;
+  }
+  if (!isLocalBrowserOrigin()) {
+    throw new ApiError("لا يمكن الاتصال بـ Ollama المحلي من نسخة Lovable المستضافة.", "http", 403);
   }
   const token = getLocalToken();
   if (!token) throw new ApiError("أدخل رمز الخادم المحلي من الإعدادات أولاً", "http", 401);
