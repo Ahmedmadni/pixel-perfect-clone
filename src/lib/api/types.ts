@@ -103,14 +103,23 @@ export interface ScheduledTask {
   requiresApproval: boolean;
 }
 
-export interface ApprovalRequest {
-  id: string;
+export type ApprovalKind = "external_message" | "publish_comment" | "project_change" | "other";
+export interface ApprovalDraft {
+  kind: ApprovalKind;
   action: string;
   target: string;
   preview: string;
+}
+export interface ApprovalRequest extends ApprovalDraft {
+  id: string;
   risk: "low" | "medium" | "high";
   createdAt: string;
-  status: "pending" | "approved" | "rejected";
+  expiresAt?: string;
+  decidedAt?: string | null;
+  payloadDigest?: string;
+  // Human decision on a draft NEVER authorizes an automatic external send.
+  executable?: false;
+  status: "pending" | "approved" | "rejected" | "expired";
 }
 
 export interface ActivityLog {
