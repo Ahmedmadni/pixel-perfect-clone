@@ -46,7 +46,7 @@ This creates a gitignored `runtime/.env` and prints a one-time 64-character toke
 - Keep `OLLAMA_URL=http://127.0.0.1:11434`. Only loopback HTTP origins are accepted.
 - Never commit `.env`, send your token in chat, or expose PostgreSQL to the internet.
 
-Run PostgreSQL migrations 001–005 (including task history and internal notifications) and start the runtime:
+Run PostgreSQL migrations 001–007 (including task history and internal notifications) and start the runtime:
 
 ```powershell
 npm run migrate
@@ -145,3 +145,19 @@ Important: User-facing AI takeover remains unavailable until a real, permitted a
 ## Safety
 
 All services should bind to `127.0.0.1` only. The API token controls the local runtime; noVNC must have separate access restrictions once installed. Treat user-created knowledge and browser profiles as sensitive local files, ensure backups are encrypted, and preserve a manual emergency-stop capability.
+
+## Human approvals and site review permissions
+
+Migration 006 adds immutable, expiring review drafts; migration 007 adds per-site read-only permissions.
+Use **Accounts** to register a domain and explicitly allow reading it. By default, review is denied.
+The same domain must be in `browser-worker/.env` `BROWSER_AGENT_DOMAINS`; both checks apply.
+Use **Approvals** to prepare and approve draft messages or posts, but approval only
+records a decision and **does not send or publish content**. No external write tools exist.
+
+Run tests before claiming the integration works:
+```powershell
+cd runtime
+npm run typecheck
+npm test
+```
+Set `TEST_DATABASE_URL` only for a disposable PostgreSQL test database to run SQL tests.
