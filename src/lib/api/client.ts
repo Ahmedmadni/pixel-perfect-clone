@@ -100,6 +100,12 @@ export const api = {
   cancelReview: (id: string) =>
     request<{ok: true; cancelling: true}>(`/v1/tasks/${encodeURIComponent(id)}/cancel`, post({})),
   accounts: () => request<BrowserAccount[]>("/v1/accounts", undefined, mock.accounts),
+  registerReviewDomain: (domain: string, label: string) =>
+    request<{id:string;domain:string;label:string;canReview:boolean}>("/v1/accounts", post({domain,label})),
+  setDomainReview: (id: string, allow: boolean) =>
+    request<{id:string;domain:string;label:string;canReview:boolean}>(
+      `/v1/accounts/${encodeURIComponent(id)}/review`, post({allow}),
+    ),
   schedules: () => request<ScheduledTask[]>("/v1/schedules", undefined, mock.schedules),
   approvals: () => request<ApprovalRequest[]>("/v1/approvals", undefined, mock.approvals),
   createApprovalDraft: (draft: ApprovalDraft) =>
