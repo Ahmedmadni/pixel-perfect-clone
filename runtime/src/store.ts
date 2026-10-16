@@ -107,10 +107,11 @@ export class PgControlStore implements ControlStore {
           "004_agent_tasks.sql",
           "005_notifications.sql",
           "006_approval_queue.sql",
+          "007_review_permissions.sql",
         ]],
       );
-      if (applied.rowCount !== 6) {
-        throw new Error("PostgreSQL migrations 001–006 are required");
+      if (applied.rowCount !== 7) {
+        throw new Error("PostgreSQL migrations 001–007 are required");
       }
     });
   }
