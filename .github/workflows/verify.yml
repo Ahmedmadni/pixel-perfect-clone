@@ -66,3 +66,41 @@ jobs:
         run: node --check src/server.mjs && node --check src/policy.mjs
       - name: Test agent domain and ownership policies
         run: npm test
+
+  postgres-integration:
+    name: PostgreSQL migrations and real database integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: paw_test
+          POSTGRES_PASSWORD: ci-ephemeral-only
+          POSTGRES_DB: paw_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U paw_test -d paw_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    defaults:
+      run:
+        working-directory: runtime
+    env:
+      TEST_DATABASE_URL: postgres://paw_test:ci-ephemeral-only@127.0.0.1:5432/paw_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: runtime/package-lock.json
+      - name: Install runtime dependencies
+        run: npm ci
+      - name: Run schema migrations against disposable PostgreSQL
+        run: |
+          DATABASE_URL="$TEST_DATABASE_URL" npm run migrate
+      - name: Execute real database and other runtime tests sequentially
+        run: npm test -- --maxWorkers=1 --minWorkers=1
