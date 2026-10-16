@@ -2,6 +2,7 @@ import { BrowserGateway } from "./browser-gateway.ts";
 import { OllamaClient } from "./ollama.ts";
 import type { ControlStore } from "./store.ts";
 import type { AgentTaskRecord, TaskRepository, TaskStep } from "./task-store.ts";
+import type { PermissionRepository } from "./review-permissions.ts";
 
 export class AgentNotReadyError extends Error {}
 export class AgentBusyError extends Error {}
@@ -18,6 +19,7 @@ export class ReadOnlyAgent {
     private readonly browser: BrowserGateway,
     private readonly ollama: OllamaClient,
     private readonly tasks: TaskRepository,
+    private readonly permissions: PermissionRepository,
     private readonly withControl: <T>(fn: () => Promise<T>) => Promise<T>,
   ) {}
 
@@ -45,7 +47,11 @@ export class ReadOnlyAgent {
     const models = await this.ollama.listModels();
     if (!models.some((m) => m.name === input.model)) throw new AgentNotReadyError("Model is not installed");
     const tabs = await this.browser.tabs();
-    if (!tabs.some((t) => t.id === input.tabId)) throw new AgentNotReadyError("Selected browser tab unavailable");
+    const selectedTab = tabs.find((t) => t.id === input.tabId);
+    if (!selectedTab) throw new AgentNotReadyError("Selected browser tab unavailable");
+    if (!(await this.permissions.isAllowed(selectedTab.url))) {
+      throw new AgentNotReadyError("Read-only permission not granted for this website");
+    }
     const task = await this.tasks.create(input);
     try {
       if (health.mode === "STOPPED") await this.browser.handoff("MANUAL");
@@ -105,6 +111,8 @@ export class ReadOnlyAgent {
       await step("start", "Started read-only page review");
       if (signal.aborted) throw new Error("Cancelled");
       const page = await this.browser.inspect(task.tabId); // worker rechecks site allowlist and ownership
+      // A redirect may change the active page after the task starts. Recheck domain before sending text to Ollama.
+      if (!(await this.permissions.isAllowed(page.url))) throw new Error("Read permission no longer covers the current page");
       if (signal.aborted) throw new Error("Cancelled");
       await step("inspect", "Read approved page: " + new URL(page.url).hostname);
       const trimmed = page.untrustedPageText.slice(0, 10_000);
