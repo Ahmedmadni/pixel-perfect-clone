@@ -20,6 +20,28 @@ jobs:
     env:
       BROWSER_WORKER_TOKEN: "ci-test-only-do-not-reuse-this-secret-0000000000000000"
       VNC_PASSWORD: "ci-demo1"
+      RUNTIME_TOKEN: "ci-test-runtime-token-000000000000000000000000000"
+      TEST_DATABASE_URL: postgres://paw_ci:ephemeral-test-only@127.0.0.1:5432/paw_ci
+      DATABASE_URL: postgres://paw_ci:ephemeral-test-only@127.0.0.1:5432/paw_ci
+      OLLAMA_URL: http://127.0.0.1:11434
+      BROWSER_WORKER_URL: http://127.0.0.1:4300
+      RUNTIME_HOST: "127.0.0.1"
+      RUNTIME_PORT: "4100"
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: paw_ci
+          POSTGRES_PASSWORD: ephemeral-test-only
+          POSTGRES_DB: paw_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U paw_ci -d paw_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v4
       - name: Configure throwaway local test credentials
@@ -62,11 +84,37 @@ jobs:
           curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
             -d '{"state":"STOPPED"}' http://127.0.0.1:4300/control > /tmp/paw-stopped.json
           node -e 'const h = require("/tmp/paw-stopped.json"); process.exit(h.mode === "STOPPED" && h.viewOnly ? 0 : 1)'
+      - name: Configure integration Node runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: runtime/package-lock.json
+      - name: Install runtime
+        working-directory: runtime
+        run: npm ci
+      - name: Apply seven PostgreSQL schema migrations
+        working-directory: runtime
+        run: npm run migrate
+      - name: Start disposable fake Ollama and real Fastify runtime
+        run: |
+          node runtime/test/fixtures/fake-ollama.mjs > /tmp/paw-fixture.log 2>&1 &
+          echo $! > /tmp/paw-fixture.pid
+          (cd runtime && npm run start) > /tmp/paw-runtime.log 2>&1 &
+          echo $! > /tmp/paw-runtime.pid
+      - name: Verify combined Fastify / PostgreSQL / Chromium / noVNC / fake Ollama
+        run: node runtime/scripts/e2e-local.mjs
       - name: Browser diagnostics on failure
         if: failure()
-        run: docker compose -f compose.browser.yml logs --no-color --tail=160 || true
+        run: |
+          docker compose -f compose.browser.yml logs --no-color --tail=160 || true
+          tail -n 100 /tmp/paw-runtime.log || true
+          tail -n 50 /tmp/paw-fixture.log || true
       - name: Tear down throwaway browser and profile
         if: always()
         run: |
           docker compose -f compose.browser.yml down -v || true
           rm -f browser-worker/.env
+          for file in /tmp/paw-runtime.pid /tmp/paw-fixture.pid; do
+            if [ -f "$file" ]; then kill "$(cat "$file")" || true; fi
+          done
