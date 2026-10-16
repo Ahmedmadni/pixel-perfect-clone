@@ -6,6 +6,23 @@ Date: 2026-10-16
 - Lovable project: `d8eb5115-13ea-4fc2-9819-de495b7a7f34`.
 - Lovable's internal latest edit SHA has differed from GitHub main in prior checks. **Confirm synchronization before a fresh Lovable edit.** Do not force push or rewrite history.
 
+## Cloud verification (2026-10-16)
+
+Public-repository GitHub Actions have now executed successfully for the
+frontend, local runtime and actual disposable PostgreSQL. See verified run:
+https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/38869168507
+
+- Frontend: 65/65 Vitest tests passed, strict TypeScript passed, production build passed.
+- Runtime (without real Postgres): 43 tests passed, 4 real-DB tests skipped when no connection is configured.
+- Real PostgreSQL 16 CI: 7/7 migrations applied, 47/47 runtime tests passed,
+  including control audit, write-protected approvals, expiring decisions,
+  read-only site permissions and task notifications.
+- Browser policy: 3/3 lightweight Node tests passed.
+- A separate **live Chromium/noVNC Docker smoke test** was added via
+  `.github/workflows/browser-smoke.yml` and must be read separately; passing
+  source tests does NOT prove Chromium/VNC is running.
+- User-device Windows/WSL2/actual account sessions/Ollama inference have NOT been tested.
+
 ## Completed as source code, not as production verification
 
 ### Phase 1 — UI
@@ -61,17 +78,17 @@ Native Ollama model discovery/streaming client, model picker, live text stream U
 - Ollama chat includes a bounded locally retrieved selection of instructions, styles and request-relevant records.
 - No cloud database or paid vector service needed; full semantic memory, backup/import controls and device verification remain future work.
 
-## Tests added but not yet executed on the latest code
+## Additional device/integration tests still required
 - Browser policy: `browser-worker/test/policy.test.mjs`.
 - Fastify bridge: `runtime/test/browser.test.ts`.
 - PostgreSQL knowledge route contract: `runtime/test/knowledge.test.ts`.
 - Ollama model/stream and local-memory unit tests under `runtime/test/`.
 - Opt-in GitHub Actions: `.github/workflows/verify.yml` (manual workflow_dispatch, not automatic to conserve private-repository usage minutes).
 
-**Do not call this a tested system yet.** The unit tests added after earlier Lovable reports have not been independently run or validated on the owner's PC. Browser Docker image, Linux user namespace/seccomp, actual noVNC mouse ownership and persistent login sessions must be tested locally before declaring operational readiness.
+**The repository now passes cloud tests, including a real PostgreSQL database.** This still does not certify the physical Windows runtime, real browser, VNC handoff or logged-in sessions. Browser Docker image, Linux user namespace/seccomp, actual noVNC mouse ownership and persistent login sessions must be tested locally before declaring operational readiness.
 
 ## Remaining milestones
-1. Run manual GitHub Actions cloud CI/static checks; fix any typecheck, tests or build failures before local installation.
+1. Maintain passing public CI after every commit; investigate the independent Chromium/noVNC smoke result and fix failures.
 2. Windows/WSL2 smoke test of PostgreSQL, Ollama, Docker browser worker, noVNC password and server-side VNC handoff.
 3. Test approvals and deny-by-default domain policies end-to-end; only then design separate official, user-authorized adapters for any future external actions.
 4. Phase 2F: durable task scheduling and optional free internal/Telegram status alerts with opt-in and no personal page content by default.
