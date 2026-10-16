@@ -64,6 +64,24 @@ function SettingsPage() {
           </div>
           {MOCK_MODE && <p className="mt-2 text-xs text-muted-foreground">أوقف وضع البيانات التجريبية محليًا قبل استخدام رمز الاتصال.</p>}
         </Panel>
+        <Panel title="النسخ الاحتياطي المشفّر">
+          <p className="mb-3 text-xs text-muted-foreground">
+            يتم تشفير بيانات PostgreSQL محليًا بكلمة مرور تختارها، دون رفعها إلى GitHub أو Lovable.
+            الاستعادة دائمًا في قاعدة جديدة، ولا تستبدل قاعدة بياناتك الحالية.
+          </p>
+          <p className="text-xs font-medium">إنشاء نسخة (PowerShell على Windows):</p>
+          <code dir="ltr" className="my-2 block select-all overflow-x-auto rounded-md bg-muted p-2 text-xs">
+            powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\backup.ps1
+          </code>
+          <p className="text-xs font-medium">فحص واستعادة نسخة مشفّرة:</p>
+          <code dir="ltr" className="my-2 block select-all overflow-x-auto rounded-md bg-muted p-2 text-xs">
+            powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\restore.ps1 -InputPath "D:\Backups\my-workspace.pawbak"
+          </code>
+          <p className="text-xs text-muted-foreground">
+            شغّل الأوامر من مجلد المشروع على الكمبيوتر المحلي. هذه الشاشة لا تستقبل كلمة مرور النسخة
+            ولا تنفذ الاستعادة من المتصفح. النسخة الحالية لا تشمل ملفات جلسة Chromium.
+          </p>
+        </Panel>
         <Panel title="اللغة">
           <div className="flex gap-2">
             <Button variant={lang === "ar" ? "default" : "secondary"} onClick={() => setLang("ar")}>العربية</Button>
