@@ -114,7 +114,7 @@ jobs:
       - name: Parse local Windows scripts without executing them
         shell: pwsh
         run: |
-          $paths = @("scripts/windows/setup.ps1", "scripts/windows/start.ps1")
+          $paths = @("scripts/windows/setup.ps1", "scripts/windows/start.ps1", "scripts/windows/diagnose.ps1")
           foreach ($path in $paths) {
             $tokens = $null
             $parseErrors = $null
