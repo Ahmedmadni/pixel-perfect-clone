@@ -27,8 +27,9 @@ jobs:
           {
             echo "BROWSER_WORKER_TOKEN=$BROWSER_WORKER_TOKEN"
             echo "VNC_PASSWORD=$VNC_PASSWORD"
-            echo "BROWSER_AGENT_DOMAINS=example.org"
+            echo "BROWSER_AGENT_DOMAINS="
             echo "BROWSER_ENABLE_READONLY_AGENT=false"
+            echo "BROWSER_CI_TRUSTED_SMOKE=true"
           } > browser-worker/.env
           chmod 600 browser-worker/.env
       - name: Build and launch real browser, VNC and noVNC
