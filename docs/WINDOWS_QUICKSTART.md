@@ -97,6 +97,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\backup.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\restore.ps1 -InputPath "D:\PrivateBackups\my-workspace.pawbak"
 ```
 
+للتأكد من سلامة النسخة **من غير استعادة** أضف `-VerifyOnly` للأمر:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\restore.ps1 -InputPath "D:\PrivateBackups\my-workspace.pawbak" -VerifyOnly
+```
+
 الاستعادة تتحقق من سلامة النسخة، ثم تنشئ قاعدة منفصلة للاختبار ولا
 تستبدل قاعدة `paw`. في اختبارات GitHub نجح النسخ والاسترجاع باستخدام
 بيانات PostgreSQL تجريبية، وليس بيانات المستخدم الفعلية.
