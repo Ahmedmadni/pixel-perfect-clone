@@ -5,6 +5,7 @@ import type { ControlStore } from "../src/store.ts";
 import type { BrowserGateway, WorkerHealth, WorkerTab } from "../src/browser-gateway.ts";
 import type { OllamaClient, OllamaChatMessage } from "../src/ollama.ts";
 import type { TaskRepository, AgentTaskRecord, TaskStep } from "../src/task-store.ts";
+import type { PermissionRepository } from "../src/review-permissions.ts";
 import { initialControl, nextState, type ControlSnapshot } from "../../src/lib/control-machine.ts";
 
 const token = "t".repeat(64);
@@ -62,7 +63,8 @@ function fake() {
     list: async () => memory,
     recover: async () => {},
   };
-  return { store, browser, ollama, tasks, health, memory };
+  const permissions = {isAllowed: async (url:string) => new URL(url).hostname === "example.com"} as PermissionRepository;
+  return { store, browser, ollama, tasks, permissions, health, memory };
 }
 async function settled(task: AgentTaskRecord, delay = 5) {
   for(let i=0;i<100;i++){
@@ -75,7 +77,7 @@ async function settled(task: AgentTaskRecord, delay = 5) {
 describe("Phase 2E read-only review HTTP API", () => {
   it("requires authentication and validates model/tab/objective", async () => {
     const f=fake();
-    const app=await buildApp(config,f.store,{browser:f.browser,ollama:f.ollama,tasks:f.tasks});
+    const app=await buildApp(config,f.store,{browser:f.browser,ollama:f.ollama,tasks:f.tasks,permissions:f.permissions});
     expect((await app.inject({url:"/v1/tasks"})).statusCode).toBe(401);
     expect((await app.inject({url:"/v1/tasks",headers})).statusCode).toBe(200);
     const malformed = await app.inject({url:"/v1/tasks", method:"POST", headers, payload:{objective:"x",tabId,model:"local:latest"}});
