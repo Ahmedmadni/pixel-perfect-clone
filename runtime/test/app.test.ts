@@ -60,8 +60,8 @@ describe("runtime API", () => {
   it("refuses to report agent active before a real browser worker is verified", async () => {
     const app = await buildApp(cfg, memStore());
     const result = await app.inject({ method: "POST", url: "/v1/agent/control", headers: auth, payload: { type: "START_AGENT" } });
-    expect(result.statusCode).toBe(503);
-    expect(result.json().error).toBe("browser_agent_not_ready");
+    expect(result.statusCode).toBe(409);
+    expect(result.json().error).toBe("start_review_task_instead");
   });
 
   it("validates bodies strictly", async () => {
