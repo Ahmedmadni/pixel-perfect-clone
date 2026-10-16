@@ -4,7 +4,7 @@ import { createReadStream } from "node:fs";
 import { mkdtemp, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { encryptStream, decryptToFile } from "./crypto.mjs";
+import { encryptStream, decryptToFile, verifyEncryptedFile } from "./crypto.mjs";
 
 async function fixture(fn) {
   const dir=await mkdtemp(join(tmpdir(),"paw-crypto-test-"));
@@ -25,6 +25,7 @@ describe("PAW portable encrypted local backups",()=>{
       await encryptStream(createReadStream(source),second,pw);
       assert.notDeepEqual(await readFile(first),await readFile(second),"salt/IV must be random");
       assert.notDeepEqual((await readFile(first)).subarray(0,32),data.subarray(0,32));
+      assert.equal(await verifyEncryptedFile(first,pw),true);
       await decryptToFile(first,decoded,pw);
       assert.deepEqual(await readFile(decoded),data);
       if(process.platform!=="win32")assert.equal((await stat(first)).mode & 0o077,0);
@@ -35,6 +36,7 @@ describe("PAW portable encrypted local backups",()=>{
       const src=join(dir,"in"),backup=join(dir,"backup.pawbak"),output=join(dir,"out");
       await writeFile(src,"secret user data");
       await encryptStream(createReadStream(src),backup,pw);
+      await assert.rejects(verifyEncryptedFile(backup,"Different passphrase 1234!"),/incorrect|damaged/);
       await assert.rejects(decryptToFile(backup,output,"Different passphrase 1234!"),/incorrect|damaged/);
       await assert.rejects(stat(output),{code:"ENOENT"});
     });
@@ -47,6 +49,7 @@ describe("PAW portable encrypted local backups",()=>{
       const broken=await readFile(backup);
       broken[50]^=1;
       await writeFile(backup,broken);
+      await assert.rejects(verifyEncryptedFile(backup,pw),/incorrect|damaged/);
       await assert.rejects(decryptToFile(backup,output,pw),/incorrect|damaged/);
       await assert.rejects(stat(output),{code:"ENOENT"});
     });
