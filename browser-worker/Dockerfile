@@ -9,7 +9,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 WORKDIR /home/pwuser/app
 COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund \
-    && mkdir -p /home/pwuser/browser-data/default \
+    && mkdir -p /home/pwuser/browser-data/default /tmp/.X11-unix \
+    && chmod 1777 /tmp/.X11-unix \
     && chown -R pwuser:pwuser /home/pwuser
 COPY src ./src
 COPY scripts ./scripts
