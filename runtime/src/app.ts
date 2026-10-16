@@ -154,7 +154,7 @@ export async function buildApp(
       const agentStarts = ["START_AGENT", "APPROVE", "RESUME"].includes(event.type);
       // Control messages alone must NEVER acquire or resume AI browser ownership.
       // Only a task created by ReadOnlyAgent.start() may enter AGENT_ACTIVE.
-      if (agent && agentStarts) {
+      if (agentStarts) {
         return { status: 409, body: { error: "start_review_task_instead" } };
       }
       if (["TAKE_OVER", "PAUSE", "EMERGENCY_STOP", "FAIL", "REJECT"].includes(event.type)) agent?.cancelActive();
