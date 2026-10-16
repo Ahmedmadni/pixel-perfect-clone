@@ -114,7 +114,7 @@ jobs:
       - name: Parse local Windows scripts without executing them
         shell: pwsh
         run: |
-          $paths = @("scripts/windows/setup.ps1", "scripts/windows/start.ps1", "scripts/windows/diagnose.ps1", "scripts/windows/backup.ps1", "scripts/windows/restore.ps1")
+          $paths = @("scripts/windows/setup.ps1", "scripts/windows/start.ps1", "scripts/windows/diagnose.ps1", "scripts/windows/backup.ps1", "scripts/windows/restore.ps1", "scripts/windows/scheduled-backup.ps1")
           foreach ($path in $paths) {
             $tokens = $null
             $parseErrors = $null
@@ -205,3 +205,14 @@ jobs:
         run: |
           docker compose --env-file local/.env -f compose.database.yml down -v || true
           rm -f /tmp/paw-test.pawbak local/.env
+
+  windows-dpapi-selftest:
+    name: Windows DPAPI owner-scoped scheduled backup self-test
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run owner-scoped DPAPI round-trip WITHOUT registering any scheduled task
+        shell: powershell
+        run: |
+          .\scripts\windows\scheduled-backup.ps1 -SelfTest
