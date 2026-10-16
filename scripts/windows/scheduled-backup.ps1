@@ -121,7 +121,19 @@ if($SelfTest) {
       if((ToPlaintext $opened) -cne "Synthetic DPAPI secret: never a user passphrase!") {
         throw "DPAPI did not roundtrip correctly"
       }
-      Write-Host "PASS: DPAPI CurrentUser roundtrip; no backups/tasks/secrets were created."
+      # Construct a real Task Scheduler definition on Windows without registering.
+      $checkArgs='-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}" -Run' -f $scriptPath
+      $testAction=New-ScheduledTaskAction -Execute "powershell.exe" -Argument $checkArgs -WorkingDirectory $root
+      $testTrigger=New-ScheduledTaskTrigger -Daily -At ([datetime]::Today.AddHours(3))
+      $testSettings=New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 40)
+      $testPrincipal=New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+      if(-not $testAction -or -not $testTrigger -or -not $testSettings -or -not $testPrincipal) {
+        throw "Windows Task Scheduler API could not prepare a safe interactive-user task"
+      }
+      if($testAction.Arguments.Contains("Synthetic DPAPI secret")) {
+        throw "Credential leaked into scheduled task arguments"
+      }
+      Write-Host "PASS: DPAPI CurrentUser + Task Scheduler definition; no backup or task was registered."
     } finally {$opened.Dispose()}
   } finally {$secure.Dispose()}
   return
