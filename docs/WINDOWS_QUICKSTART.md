@@ -111,6 +111,32 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\restore.ps
 هذه النسخة تشمل البيانات الموجودة في PostgreSQL فقط ولا تتضمن كوكيز
 المتصفح أو Docker Volumes أو إعدادات Ollama.
 
+## النسخ التلقائي المشفّر (اختياري)
+
+يدعم Windows الآن إنشاء نسخة PostgreSQL مشفرة يوميًا، باستخدام
+Windows Task Scheduler مع تشفير DPAPI المرتبط بحساب Windows الخاص بك.
+لا توجد مهمة مجدولة ما لم تُفعّلها بنفسك، ولا تُحذف ملفات النسخ
+القديمة تلقائيًا.
+
+```powershell
+# تفعيل نسخة يومية عند الساعة الثالثة صباحًا
+.\scripts\windows\scheduled-backup.ps1 -Enable -Hour 3 -Minute 0
+
+# فحص حالة المهمة ونتيجة آخر تشغيل
+.\scripts\windows\scheduled-backup.ps1 -Status
+
+# إيقاف الجدولة دون حذف النسخ السابقة
+.\scripts\windows\scheduled-backup.ps1 -Disable
+```
+
+يلزم أن تكون مسجّل الدخول إلى حساب Windows نفسه وقت عمل المهمة.
+عند التفعيل تختار عبارة مرور لا تقل عن 16 حرفًا، ويجب حفظها في مدير
+كلمات مرور مستقل حتى تتمكن من استرجاع النسخ على كمبيوتر آخر إذا فقدت
+جهازك أو حساب Windows. DPAPI **لا يُغني عن حفظ عبارة الاسترجاع**.
+
+لا يتم نسخ كوكيز Chromium أو مفاتيح الخدمات ولا رفع الملفات تلقائيًا
+إلى السحابة. راجع [الدليل التفصيلي للنسخ المشفر](BACKUP_AND_RESTORE.md).
+
 ## Browser permissions and privacy
 
 The browser uses a Docker volume to keep session profiles across container
