@@ -1,8 +1,10 @@
 name: Verify Cloud Development
 
-# Manual only: avoids consuming private-repository runner minutes on every commit.
-# Run through GitHub Actions > Verify Cloud Development > Run workflow when needed.
+# Validate updates to the public repository automatically.
+# Hosted runner availability depends on GitHub Actions settings.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
