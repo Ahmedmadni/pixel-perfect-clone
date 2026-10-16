@@ -130,6 +130,37 @@ jobs:
             echo "Profile cookie was not recovered safely after restart" >&2
             exit 1
           fi
+      - name: Refuse copying active Chromium profile then encrypt stopped profile
+        run: |
+          pass='Temporary CI Chromium passphrase - no real cookies 2026'
+          if printf '%s\n' "$pass" | node scripts/backup/browser-profile.mjs backup --output /tmp/should-never-exist.pawprofile; then
+            echo "Security failure: profile backup allowed a running browser" >&2
+            exit 1
+          fi
+          test ! -e /tmp/should-never-exist.pawprofile
+          docker compose -f compose.browser.yml stop browser-worker
+          printf '%s\n' "$pass" | node scripts/backup/browser-profile.mjs backup --output /tmp/ci-chromium.pawprofile
+          printf '%s\n' "$pass" | node scripts/backup/browser-profile.mjs verify --input /tmp/ci-chromium.pawprofile
+          if printf '%s\n' 'A totally different CI passphrase!' | \
+            node scripts/backup/browser-profile.mjs verify --input /tmp/ci-chromium.pawprofile; then
+            echo "Wrong-password Chromium profile validation unexpectedly succeeded" >&2
+            exit 1
+          fi
+      - name: Restore Chromium data to separate never-attached Docker volume
+        run: |
+          pass='Temporary CI Chromium passphrase - no real cookies 2026'
+          printf '%s\n' "$pass" | \
+            node scripts/backup/browser-profile.mjs restore --input /tmp/ci-chromium.pawprofile > /tmp/ci-profile-restore.log
+          volume="$(sed -n 's/^Restored into NEW UNATTACHED Docker volume: //p' /tmp/ci-profile-restore.log)"
+          if [ -z "$volume" ]; then echo "Missing restored volume" >&2; exit 1; fi
+          echo "$volume" > /tmp/ci-restored-volume.txt
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --mount "type=volume,source=$volume,target=/profile,readonly" \
+            alpine:3.20 test -d /profile/default
+          source_volume="$(docker inspect "$(docker compose -f compose.browser.yml ps -a -q browser-worker)" \
+            --format '{{range .Mounts}}{{if eq .Destination "/home/pwuser/browser-data"}}{{.Name}}{{end}}{{end}}')"
+          test "$source_volume" != "$volume"
+          echo 'PASS: encrypted Chromium snapshot verified and restored to an unlinked new Docker volume'
       - name: Browser diagnostics on failure
         if: failure()
         run: |
@@ -140,7 +171,10 @@ jobs:
         if: always()
         run: |
           docker compose -f compose.browser.yml down -v || true
-          rm -f browser-worker/.env
+          rm -f browser-worker/.env /tmp/ci-chromium.pawprofile
+          if [ -f /tmp/ci-restored-volume.txt ]; then
+            docker volume rm "$(cat /tmp/ci-restored-volume.txt)" || true
+          fi
           for file in /tmp/paw-runtime.pid /tmp/paw-fixture.pid; do
             if [ -f "$file" ]; then kill "$(cat "$file")" || true; fi
           done
