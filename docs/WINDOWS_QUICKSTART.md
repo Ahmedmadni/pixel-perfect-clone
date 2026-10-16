@@ -52,6 +52,25 @@ Lovable's hosted preview or any third-party URL.
 Find the noVNC password in `browser-worker/.env` locally if requested.
 Only access the local noVNC page at `http://127.0.0.1:6080/vnc.html`.
 
+## فحص حالة الخدمات (من غير مشاركة أسرار)
+
+من جذر المشروع افتح PowerShell وشغّل:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\diagnose.ps1
+```
+
+الفحص يعرض إذا كانت قاعدة PostgreSQL وFastify وChromium وnoVNC وOllama
+موجودة وتستجيب، ولا يغيّر حالة التحكم أو يسحب أي معلومات من الحسابات،
+ولا يطبع كلمات المرور أو رموز الوصول. يظل تشغيل Ollama بنموذج حقيقي
+والتحكم بمتصفح المستخدم بحاجة إلى اختبار فعلي على Windows.
+
+إذا تعطل تثبيت التبعيات أثناء `setup.ps1` بعد إنشاء ملفات `.env`،
+**لا تحذف ملفات الإعداد القديمة ولا تعيد إنشاءها**؛ من جذر المشروع
+شغّل `bun install --frozen-lockfile` ثم `cd runtime; npm ci`، وبعد
+نجاحهما شغّل `start.ps1` من جذر المشروع. ملفات الإعداد تحتوي أسرار
+المستخدم ولا يجب إرسالها للمطور أو رفعها إلى GitHub.
+
 ## Browser permissions and privacy
 
 The browser uses a Docker volume to keep session profiles across container
