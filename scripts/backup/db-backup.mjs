@@ -12,7 +12,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import { pipeline } from "node:stream/promises";
-import { decryptToFile, encryptStream } from "./crypto.mjs";
+import { decryptToFile, encryptStream, verifyEncryptedFile } from "./crypto.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const compose = ["compose", "--env-file","local/.env","-f","compose.database.yml","exec","-T","database"];
@@ -81,6 +81,8 @@ async function backup(destination, password) {
     await Promise.all([encryptStream(proc.stdout,temporary,password),completed]);
     const size=(await stat(temporary)).size;
     if(size<100)throw new Error("pg_dump returned an unexpectedly small archive");
+    // Re-read the completed encrypted file and authenticate it before publishing.
+    await verifyEncryptedFile(temporary,password);
     // Atomic no-clobber finalization on same filesystem, including NTFS.
     await link(temporary,target);
     console.log("Encrypted backup created:",target);
@@ -130,15 +132,20 @@ async function restore(source, password, databaseArg) {
 }
 async function main() {
   const action=process.argv[2];
-  if(!["backup","restore"].includes(action))throw new Error("Usage: db-backup.mjs backup --output PATH | restore --input PATH [--database paw_restore_...]");
+  if(!["backup","restore","verify"].includes(action))throw new Error("Usage: db-backup.mjs backup --output PATH | verify --input PATH | restore --input PATH [--database paw_restore_...]");
   const password=await passwordFromStdin();
   if(action==="backup") {
     const dest=getArgument("--output") || join(homedir(),"PAW-Backups","paw-"+new Date().toISOString().replace(/[:.]/g,"-")+".pawbak");
     await backup(dest,password);
   } else {
     const input=getArgument("--input");
-    if(!input)throw new Error("Restore requires --input PATH");
-    await restore(input,password,getArgument("--database"));
+    if(!input)throw new Error("Verify/restore requires --input PATH");
+    if(action==="verify") {
+      await verifyEncryptedFile(await realpath(resolve(input)),password);
+      console.log("Encrypted backup file and password verified. No database was created or modified.");
+    } else {
+      await restore(input,password,getArgument("--database"));
+    }
   }
 }
 main().catch((error)=>{
