@@ -96,7 +96,7 @@ async function backup(output,password) {
   const target=await ensureDestination(output);
   const temp=join(dirname(target),".paw-profile-"+randomBytes(12).toString("hex")+".partial");
   const args=["run","--rm","--network","none","--read-only",
-    "--user","1000:1000","--cap-drop","ALL","--security-opt","no-new-privileges",
+    "--cap-drop","ALL","--cap-add","DAC_OVERRIDE","--security-opt","no-new-privileges",
     "--mount",`type=volume,source=${volume},target=/source,readonly`,
     image,"tar","-C","/source","-cf","-","."];
   const job=startDocker(args,{stream:true});
@@ -128,16 +128,11 @@ async function restore(input,password) {
     await decryptToFile(source,plaintext,password,"browser-profile");
     name="paw_profile_restore_"+randomBytes(10).toString("hex");
     await startDocker(["volume","create",name],{capture:true}).output();
-    // One-time ownership setup is limited to the brand-new disconnected volume.
-    // It has no host mounts, network or access to the original profile.
-    const prepare=startDocker(["run","--rm","--network","none","--read-only",
-      "--cap-drop","ALL","--cap-add","CHOWN","--security-opt","no-new-privileges",
-      "--mount",`type=volume,source=${name},target=/restore`,
-      image,"chown","1000:1000","/restore"],{capture:true});
-    await prepare.finished;
+    // New, unattached volume only. Limited file ownership/copy capabilities:
+    // no host mounts, no network, read-only container filesystem.
     const args=["run","--rm","-i","--network","none","--read-only",
-      "--user","1000:1000",
-      "--cap-drop","ALL","--security-opt","no-new-privileges",
+      "--cap-drop","ALL","--cap-add","CHOWN","--cap-add","FOWNER",
+      "--cap-add","DAC_OVERRIDE","--security-opt","no-new-privileges",
       "--mount",`type=volume,source=${name},target=/restore`,
       image,"tar","-C","/restore","-xf","-"];
     const job=startDocker(args,{stream:true});
