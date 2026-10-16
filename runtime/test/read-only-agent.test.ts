@@ -10,7 +10,7 @@ import { initialControl, nextState, type ControlSnapshot } from "../../src/lib/c
 
 const tabId = "d20e2e9e-7a25-473f-91ae-271324414352";
 
-function fixtures(options: { agentEnabled?: boolean; inspectedText?: string } = {}) {
+function fixtures(options: { agentEnabled?: boolean; inspectedText?: string; allowDomain?: boolean } = {}) {
   let snap: ControlSnapshot = structuredClone(initialControl);
   const records: AgentTaskRecord[] = [];
   const store: ControlStore = {
@@ -66,7 +66,7 @@ function fixtures(options: { agentEnabled?: boolean; inspectedText?: string } = 
     list: async () => records,
     recover: async () => {},
   } as TaskRepository;
-  const permissions = { isAllowed: async (url: string) => new URL(url).hostname === "example.org" } as PermissionRepository;
+  const permissions = { isAllowed: async (url: string) => options.allowDomain !== false && new URL(url).hostname === "example.org" } as PermissionRepository;
   const agent = new ReadOnlyAgent(store,browser,ollama,tasks,permissions,async (fn)=>fn());
   return { agent,records,store,health, browser };
 }
@@ -106,4 +106,11 @@ describe("supervised read-only AI agent", () => {
     expect(f.records).toHaveLength(0);
     expect(f.health.mode).toBe("STOPPED");
   });
+  it("fails closed when the user has not enabled reading this domain",async()=>{
+    const f=fixtures({allowDomain:false});
+    await expect(f.agent.start({objective:"Review this restricted site",tabId,model:"local-model"})).rejects.toBeInstanceOf(AgentNotReadyError);
+    expect(f.records).toHaveLength(0);
+    expect((await f.store.getSnapshot()).state).toBe("MANUAL");
+  });
+
 });
