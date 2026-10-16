@@ -1,39 +1,70 @@
-# Workflow: Lovable + GitHub first, Windows later
+# تطوير Personal AI Workspace عبر GitHub + معاينة Lovable
 
-## Where development happens
+**آخر تحديث: 16 أكتوبر 2026**
 
-The project is authored in **Lovable** and stored in the private GitHub repository `Ahmedmadni/pixel-perfect-clone` (`main`). GitHub is the durable source for code reviews, changes and version history.
+## حقيقة بيئات المشروع
 
-There are **two distinct environments**:
+- **GitHub** هو المصدر الرسمي لكل الملفات: `Ahmedmadni/pixel-perfect-clone` على `main`.
+  المستودع **عام** الآن، وتُرفع التعديلات إليه مباشرة، مع اختبارات تلقائية عند الدفع.
+- **Lovable AI** هي مساحة عرض وتصميم الواجهة. عرضها المستضاف يجب أن
+  يبقى **تجريبيًا**، ولا يمكنه تشغيل PostgreSQL أو Ollama أو Chromium
+  الموجود على جهاز شخصي بمجرد فتح رابط المعاينة.
+- **Windows المحلي** مرحلة تشغيل واختبار لاحقة فقط؛ ليس مطلوبًا
+  للتطوير على GitHub أو مراجعة التصميم داخل Lovable.
 
-1. **Cloud development:** Lovable UI previews, GitHub source, GitHub-hosted compile/unit checks. This does not require the owner to install anything on a PC.
-2. **Local execution (later):** Fastify, PostgreSQL, Ollama, visible Chromium/Playwright/noVNC run on the owner's Windows PC (or WSL2/Docker). A cloud preview cannot prove these services are running on the owner's device.
+## التزامن بين GitHub وLovable
 
-## Rules for ongoing cloud development
+في الفحص بتاريخ 2026-10-16:
+- كانت نسخة GitHub `main` قد وصلت لتعديلات النسخ المشفّر لجلسات Chromium
+  ثم تحسينات المعاينة الحالية.
+- بينما أبلغت واجهة Lovable المتصلة عن آخر Commit
+  `36e7c712f5fbb4a4be745260f80398f91cb2b766`،
+  وهو أقدم من تاريخ GitHub الرئيسي. وملف `AppShell.tsx` المقروء من
+  Lovable كان يحتوي عبارة `phase 1` القديمة، لذلك الفرق ليس مجرد اسم.
 
-- Continue committing code directly to `main` or use feature branches/PRs if a change needs review.
-- **Never force-push, rebase published Lovable commits or reset the project.**
-- Keep `VITE_MOCK_MODE=true` in cloud preview unless a deliberately secured local bridge exists. Never submit a local API bearer token to cloud-hosted Lovable previews.
-- Do not claim any implementation is operational on Windows until locally validated. Unit tests of fake Ollama, the state machine or Fastify injection cover program behavior only.
-- Do not use paid browser-hosting services. Chromium, Playwright, noVNC and Ollama remain the intended free local stack.
-- Future cloud code commits may require syncing GitHub with Lovable. If Lovable's internal commit SHA differs from GitHub main, verify sync in both systems before prompting Lovable to rewrite the same files.
+**لا نعتبر المعاينة متزامنة ما لم يتحقق التطابق.**
+عند فحص Lovable، راجع ارتباط المشروع بمستودع
+`Ahmedmadni/pixel-perfect-clone` والفرع `main` من إعدادات تكامل
+GitHub في المشروع؛ استخدم خيارات تحديث/مزامنة الربط التي تظهر بالفعل
+في واجهتك. لا تنشئ مشروعًا جديدًا أو تعيد ربطه بمستودع آخر دون الحاجة.
+إذا ظل آخر Commit مختلفًا، يجب حل اختلاف الربط قبل تكليف Lovable AI
+بتوليد تعديلات على الملفات نفسها، حتى لا تُستبدل نسخة حديثة بأخرى قديمة.
 
-## Optional cloud tests without local installation
+[مستودع GitHub](https://github.com/Ahmedmadni/pixel-perfect-clone) ·
+[مشروع Lovable](https://lovable.dev/projects/d8eb5115-13ea-4fc2-9819-de495b7a7f34) ·
+[GitHub Actions](https://github.com/Ahmedmadni/pixel-perfect-clone/actions)
 
-GitHub Actions includes `.github/workflows/verify.yml`: **manual dispatch only**, to avoid automatically using private-repository build minutes on every commit.
+## أمان المعاينة السحابية
 
-It checks:
-- Bun frontend tests, TypeScript and production build.
-- Runtime Node 22/npm dependency installation, type checking and Vitest mock-based tests.
+- وضع البيانات التجريبية `VITE_MOCK_MODE=true` في نسخة Lovable المستضافة.
+- مكوّن `src/lib/api/origin.ts` يحصر إرسال رموز الخادم المحلي
+  في صفحة تعمل على `localhost` أو `127.0.0.1` أو loopback IPv6،
+  حتى لو ضُبط `VITE_MOCK_MODE=false` بالخطأ على استضافة خارجية.
+- لا تُدخل أبدًا `RUNTIME_TOKEN` أو رموز noVNC أو كلمات مرور
+  النسخ المشفرة أو كوكيز حساباتك في Lovable أو GitHub أو الدردشة.
+- الواجهة تعرض بوضوح كون الحسابات والجلسات والمحادثات والمهام
+  تجريبية، ولا تعتبر معاينة التصميم إثبات تشغيل محرك الوكيل المحلي.
 
-It **does not** certify PostgreSQL, Ollama, Chromium, a VNC server, WhatsApp, Facebook or Instagram running on the user's own PC. GitHub Actions quotas and charges, if any, are governed by the repository owner's GitHub plan/settings.
+## ما تم التحقق منه سحابيًا
 
-## Next implementation milestones
+تشغّل `.github/workflows/verify.yml` على `main` اختبارات React/
+TypeScript والبناء، واختبارات Fastify، وPostgreSQL 16 الحقيقي،
+واختبارات التشفير والنسخ والاستعادة. كما تفحص صياغة PowerShell
+وإعدادات Docker. وتنفذ
+`.github/workflows/browser-smoke.yml` اختبارًا عمليًا لمتصفح
+Chromium وnoVNC داخل بيئة اختبار مؤقتة، بما فيها استعادة كوكي
+مصطنعة، ورفض نسخ ملف المتصفح النشط، ونسخة مشفرة واستعادة منفصلة.
 
-- **2B:** check GitHub-side Ollama integration, fix type/build/API/streaming issues, run cloud validation, then mark Windows integration pending.
-- **2C:** Browser worker + Docker Compose + Fastify bridge + tab UI exist in source. Windows tests, sandbox validation and VNC handoff verification remain pending. Autonomous agent mode stays disabled until runner implementation.
-- **2D:** PostgreSQL knowledge tables, versioned CRUD and real-mode UI added; production migrations and opt-in legacy data import remain pending.
-- **2E:** agent task queue, approved tools, and confirmation before external effects.
-- **2F:** verified reporting and notification adapters for authorized platforms.
+هذه النتائج **لا تثبت** جاهزية الاستخدام اليومي على Windows الحقيقي،
+ولا تثبت تشغيل نموذج Ollama حقيقي أو جلسة دخول لمنصة خارجية.
 
-The first local Windows setup should occur only when a milestone needs actual user-device integration testing, not for everyday code development.
+## أسلوب متابعة التطوير
+
+1. تعديل الملفات مباشرة على GitHub، وبدون إعادة كتابة التاريخ.
+2. انتظار نتائج GitHub Actions وإصلاح فشل الاختبارات قبل اعتماد المرحلة.
+3. التحقق من تطابق الفرع والـCommit في Lovable قبل طلب تعديل منه.
+4. اعتماد تصميم RTL على الموبايل والكمبيوتر مع تحذير واضح عند المعاينة.
+5. لا يتم تمكين إرسال الرسائل أو نشر المحتوى أو دخول الحسابات تلقائيًا.
+
+دليل [Windows](WINDOWS_QUICKSTART.md) محفوظ للاستخدام لاحقًا عند
+انتقال المشروع من المعاينة السحابية إلى تشغيل الخدمات المحلية.
