@@ -16,7 +16,13 @@ async function run(label, width, height) {
   const context = await browser.newContext({ viewport: { width, height }, locale: "ar-SA" });
   const page = await context.newPage();
   const errors = [];
+  const approvalWrites = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  page.on("request", (request) => {
+    if (request.method() !== "GET" && request.url().includes("/v1/approvals")) {
+      approvalWrites.push(request.url());
+    }
+  });
   try {
     const response = await page.goto(base, { waitUntil: "domcontentloaded", timeout: 40_000 });
     assert.equal(response?.status(), 200, label + ": index request");
@@ -113,13 +119,23 @@ async function run(label, width, height) {
     await confirm.click();
     await example.getByText("مسودة معتمدة", { exact: true }).waitFor({ timeout: 10_000 });
     await example.getByText("حالة تجريبية غير محفوظة", { exact: false }).waitFor({ timeout: 10_000 });
+    // Simulate rejection on another synthetic draft; review is required again.
+    const rejectExample = page.getByTestId("approval-r2");
+    await rejectExample.getByRole("button", { name: "محاكاة رفض" }).click();
+    const rejectDialog = page.getByRole("dialog");
+    await rejectDialog.getByText("مراجعة رفض المسودة").waitFor({ timeout: 10_000 });
+    assert.equal(await rejectDialog.getByRole("button", { name: "تأكيد قرار المسودة" }).isDisabled(), true);
+    await rejectDialog.getByRole("checkbox", { name: "أؤكد مراجعة نص المسودة" }).click();
+    await rejectDialog.getByRole("button", { name: "تأكيد قرار المسودة" }).click();
+    await rejectExample.getByText("مرفوضة", { exact: true }).waitFor({ timeout: 10_000 });
+    assert.deepEqual(approvalWrites, [], label + ": mock approval UI must never POST real decisions");
     await page.getByRole("button", { name: "إعادة ضبط المحاكاة" }).click();
     await example.getByRole("button", { name: "محاكاة اعتماد" }).waitFor({ timeout: 10_000 });
     await page.getByLabel("البحث في الموافقات").fill("نص غير موجود 8675309");
     await page.getByText("لا توجد مسودات تطابق البحث", { exact: false }).waitFor({ timeout: 10_000 });
     await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
     await page.getByRole("button", { name: "منتهية الصلاحية (1)" }).click();
-    await page.getByTestId("approval-r5").getByText("انتهت وقت مراجعة هذا المثال", { exact: false }).count().then((count) => assert.equal(count, 0));
+    await page.getByTestId("approval-r5").getByText("منتهية الصلاحية", { exact: true }).waitFor({ timeout: 10_000 });
     assert.equal(await page.getByTestId("approval-r5").getByRole("button", { name: "محاكاة اعتماد" }).count(), 0,
       label + ": an expired draft must not be confirmable");
 
