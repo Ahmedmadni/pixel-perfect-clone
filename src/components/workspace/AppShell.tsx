@@ -73,12 +73,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { snap, send, connected, pending } = useControl();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hosted, setHosted] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   // Only after hydration: avoid SSR/client hostname mismatches in the Lovable preview.
-  useEffect(() => { setHosted(!isLocalBrowserOrigin()); }, []);
+  useEffect(() => {
+    setHosted(!isLocalBrowserOrigin());
+    setHydrated(true);
+  }, []);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen" data-app-ready={hydrated ? "true" : "false"}>
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-e border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
         <div className="flex items-center gap-2 border-b border-sidebar-border px-5 py-5">
           <ShieldCheck className="size-5 text-sidebar-primary" />
