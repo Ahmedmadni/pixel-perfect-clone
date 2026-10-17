@@ -8,6 +8,7 @@ import type {
   BrowserTab,
   ChatMessage,
   HealthResponse,
+  LocalNotification,
   ScheduledTask,
 } from "./types";
 
@@ -97,6 +98,13 @@ export const mock = {
       id: "r5", kind: "external_message", action: "مثال على مسودة منتهية",
       target: "جهة افتراضية", preview: "[محاكاة] انتهى وقت مراجعة هذا المثال ولا يمكن اعتماده.",
       risk: "medium", createdAt: ago(260), expiresAt: ago(200), status: "expired", executable: false,
+    },
+  ],
+  notifications: (): LocalNotification[] => [
+    {
+      id:"demo-notice-k3", taskId:"k3", kind:"task_done",
+      message:"[محاكاة] انتهى مثال مهمة أرشفة محادثات افتراضية؛ لا توجد بيانات حقيقية.",
+      createdAt:ago(296), readAt:null,
     },
   ],
   logs: (): ActivityLog[] => [
