@@ -197,6 +197,70 @@ async function operation(data, actor, action) {
     // Output is untrusted page data; agent must never follow its instructions.
     return { tabId: idOf(page), title, url: page.url(), untrustedPageText: text };
   }
+  if (action === "snapshot") {
+    const title = await page.title().catch(() => "");
+    const body = (await page.locator("body").innerText({timeout:5000}).catch(()=>"")).slice(0,6500);
+    const controls = await page.evaluate(() => {
+      const nodes = [...document.querySelectorAll("a[href],button,input,textarea,[role=button]")]
+        .filter((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden")
+        .slice(0,45);
+      return nodes.map((el,index) => {
+        const tag = el.tagName;
+        const id = "paw-" + index + "-" + Math.random().toString(36).slice(2,10).padEnd(8,"0");
+        el.setAttribute("data-paw-agent-id",id);
+        const kind = tag === "A" ? "link" : (tag === "INPUT" || tag === "TEXTAREA") ? "field" : "button";
+        const label = (el.getAttribute("aria-label") || el.getAttribute("placeholder") ||
+          el.innerText || el.getAttribute("title") || "").trim().slice(0,120);
+        return {id,kind,label,type:el.getAttribute("type") || "",href:tag === "A" ? el.href : null};
+      });
+    });
+    if (generationAtStart !== generation) throw new Error("ownership_changed");
+    return {tabId:idOf(page),title,url:page.url(),untrustedPageText:body,controls};
+  }
+  if (action === "scroll") {
+    const delta = data.direction === "down" ? 650 : data.direction === "up" ? -650 : null;
+    if (delta === null) throw new Error("invalid_agent_action");
+    await page.evaluate((distance) => window.scrollBy({top:distance,behavior:"instant"}),delta);
+    if (generationAtStart !== generation) throw new Error("ownership_changed");
+    return {tabId:idOf(page),action:"scroll",direction:data.direction};
+  }
+  if (action === "follow_link" || action === "fill") {
+    if (typeof data.elementId !== "string" || !/^paw-\d{1,2}-[a-z0-9]{8}$/.test(data.elementId))
+      throw new Error("invalid_agent_action");
+    const element = page.locator('[data-paw-agent-id="'+data.elementId+'"]');
+    if ((await element.count()) !== 1) throw new Error("element_not_found");
+    const props = await element.evaluate((el) => ({
+      tag:el.tagName,type:el.getAttribute("type")||"",
+      disabled:el.disabled === true,readOnly:el.readOnly === true,
+      href:el.tagName === "A" ? el.href : null,
+      label:(el.innerText||el.getAttribute("aria-label")||"").slice(0,120),
+    }));
+    if (action === "follow_link") {
+      if (props.tag !== "A" || !props.href) throw new Error("agent_action_requires_manual_review");
+      const destination = safeNavigationLink(props.href,props.label,agentScope.origin);
+      const guard = async (route) => {
+        try {
+          const request = route.request();
+          if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+            validateScopedAgentUrl(request.url(), agentScope.origin);
+          await route.continue();
+        } catch { await route.abort("blockedbyclient").catch(()=>{}); }
+      };
+      await page.route("**/*",guard);
+      try { await page.goto(destination,{waitUntil:"domcontentloaded",timeout:12000}); }
+      finally { await page.unroute("**/*",guard); }
+      if (generationAtStart !== generation) throw new Error("ownership_changed");
+      validateScopedAgentUrl(page.url(),agentScope.origin);
+      return {tabId:idOf(page),action:"follow_link",url:page.url()};
+    }
+    if (!safeTextControl(props.tag,props.type,props.disabled,props.readOnly))
+      throw new Error("agent_action_requires_manual_review");
+    if (typeof data.text !== "string" || data.text.length > 500) throw new Error("invalid_agent_action");
+    await element.fill(data.text,{timeout:5000});
+    if (generationAtStart !== generation) throw new Error("ownership_changed");
+    validateScopedAgentUrl(page.url(),agentScope.origin);
+    return {tabId:idOf(page),action:"fill",field:props.label};
+  }
   throw new Error("unsupported_operation");
 }
 
