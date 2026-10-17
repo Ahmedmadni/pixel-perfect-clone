@@ -1,151 +1,339 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { CheckCircle2, Clock3, Search, ShieldCheck, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, MOCK_MODE } from "@/lib/api/client";
 import type { ApprovalDraft, ApprovalKind, ApprovalRequest } from "@/lib/api/types";
+import {
+  APPROVAL_LABELS, APPROVAL_STATES, RISK_LABELS,
+  canDecideApproval, effectiveApprovalStatus, filterApprovals, summarizeApprovals,
+  type ApprovalFilter, type ApprovalRiskFilter,
+} from "@/lib/approval-view";
 import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { PageHeader, Panel, Pill, QueryState, fmtTime } from "@/components/workspace/ui-bits";
+import { PageHeader, Panel, Pill, QueryState, fmtTime, type Tone } from "@/components/workspace/ui-bits";
 
 export const Route = createFileRoute("/approvals")({
-  head: pageHead("مراجعة الموافقات", "User-reviewed immutable drafts. Approval never dispatches an external action."),
+  head: pageHead("مركز الموافقات", "Read-only review of immutable drafts. Decisions never dispatch external actions."),
   component: ApprovalsPage,
 });
 
-const riskTone = { low: "success", medium: "warning", high: "danger" } as const;
-const riskLabel = { low: "منخفضة", medium: "متوسطة", high: "عالية" } as const;
-const labels: Record<ApprovalKind,string> = {
+const riskTone = { low:"success", medium:"warning", high:"danger" } as const satisfies Record<ApprovalRequest["risk"], Tone>;
+const stateTone = {
+  pending:"warning", approved:"success", rejected:"danger", expired:"neutral",
+} as const satisfies Record<ApprovalRequest["status"], Tone>;
+const kinds: Record<ApprovalKind,string> = {
   external_message: "مسودة رسالة خارجية",
   publish_comment: "مسودة تعليق أو منشور",
   project_change: "تغيير في مشروع",
   other: "إجراء حساس آخر",
 };
 const empty: ApprovalDraft = {kind:"external_message",action:"",target:"",preview:""};
+type Decision = "approve" | "reject";
 
 function ApprovalsPage() {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["approvals"], queryFn: api.approvals, retry: 0, refetchInterval: 10000 });
-  const [draft, setDraft] = useState<ApprovalDraft>({...empty});
-  const [displayForm, setDisplayForm] = useState(false);
+  const query = useQuery({queryKey:["approvals"], queryFn:api.approvals, retry:0, refetchInterval:10000});
+  const [draft,setDraft] = useState<ApprovalDraft>({...empty});
+  const [displayForm,setDisplayForm] = useState(false);
+  const [stateFilter,setStateFilter] = useState<ApprovalFilter>("all");
+  const [riskFilter,setRiskFilter] = useState<ApprovalRiskFilter>("all");
+  const [search,setSearch] = useState("");
+  const [review,setReview] = useState<{record:ApprovalRequest;decision:Decision}|null>(null);
+  const [checked,setChecked] = useState(false);
+  // Ephemeral presentation only: nothing is stored, networked, or used as authorization in MOCK_MODE.
+  const [demoDecisions,setDemoDecisions] = useState<Record<string,"approved"|"rejected">>({});
+
   const create = useMutation({
-    mutationFn: (d: ApprovalDraft) => api.createApprovalDraft(d),
+    mutationFn: (value: ApprovalDraft) => api.createApprovalDraft(value),
     onSuccess: () => {
-      setDraft({...empty}); setDisplayForm(false);
+      setDraft({...empty});
+      setDisplayForm(false);
       void qc.invalidateQueries({queryKey:["approvals"]});
-      toast.success("تم حفظ مسودة المراجعة دون تنفيذ أي إجراء خارجي");
+      toast.success("تم حفظ مسودة مراجعة فقط، دون تنفيذ إجراء خارجي.");
     },
-    onError: (e: Error) => toast.error("تعذر حفظ المسودة: " + e.message),
+    onError: (error:Error) => toast.error("تعذر حفظ المسودة: "+error.message),
   });
   const decide = useMutation({
-    mutationFn: (v: {id:string; decision:"approve"|"reject"; digest:string}) => api.decide(v.id,v.decision,v.digest),
-    onSuccess: (response, vars) => {
-      qc.setQueryData<ApprovalRequest[]>(["approvals"], (existing) =>
-        (existing ?? []).map((a) => a.id === vars.id ? {...a,...response} : a),
-      );
+    mutationFn: (value:{id:string;decision:Decision;digest:string}) =>
+      api.decide(value.id,value.decision,value.digest),
+    onSuccess: (response, value) => {
+      qc.setQueryData<ApprovalRequest[]>(["approvals"],(existing) =>
+        (existing ?? []).map((a)=>a.id===value.id?{...a,...response}:a));
       void qc.invalidateQueries({queryKey:["approvals"]});
-      toast.success(vars.decision === "approve"
-        ? "تم اعتماد نص المسودة فقط — لم يتم إرسال أو نشر أي شيء"
-        : "تم رفض المسودة");
+      setReview(null);
+      setChecked(false);
+      toast.success(value.decision==="approve"
+        ? "تم تسجيل اعتماد المسودة فقط، ولم يُرسل أو يُنشر شيء."
+        : "تم تسجيل رفض المسودة.");
     },
-    onError: (e: Error) => {
-      toast.error("لم تُعتمد المسودة: " + e.message);
+    onError: (error:Error) => {
+      toast.error("تعذر تسجيل القرار: "+error.message);
       void qc.invalidateQueries({queryKey:["approvals"]});
     },
   });
+
+  const items = (query.data ?? []).map((item) =>
+    MOCK_MODE && demoDecisions[item.id] ? {...item,status:demoDecisions[item.id]!} : item);
+  const counts = summarizeApprovals(items);
+  const visible = filterApprovals(items,stateFilter,riskFilter,search);
+  const activeRecord = review && items.find((item)=>item.id===review.record.id);
+  const unchanged = !!activeRecord &&
+    activeRecord.preview===review?.record.preview &&
+    activeRecord.payloadDigest===review?.record.payloadDigest &&
+    activeRecord.action===review?.record.action &&
+    activeRecord.target===review?.record.target;
+  const mayConfirm = !!review && !!activeRecord && unchanged && canDecideApproval(activeRecord) &&
+    checked && !decide.isPending && (MOCK_MODE || !!activeRecord.payloadDigest);
+
   function submitDraft() {
-    if (MOCK_MODE || create.isPending) return;
-    const clean: ApprovalDraft = {
-      ...draft,
-      action:draft.action.trim(),target:draft.target.trim(),preview:draft.preview.trim(),
-    };
-    if(!clean.action || !clean.target || !clean.preview) return;
+    if(MOCK_MODE || create.isPending)return;
+    const clean={...draft,
+      action:draft.action.trim(),target:draft.target.trim(),preview:draft.preview.trim()};
+    if(!clean.action||!clean.target||!clean.preview)return;
     create.mutate(clean);
   }
-  function decideDraft(r: ApprovalRequest, decision:"approve"|"reject") {
+  function openReview(record:ApprovalRequest,decision:Decision) {
+    if(!canDecideApproval(record)) {
+      toast.error("انتهت صلاحية هذه المسودة أو سبق تسجيل قرار بشأنها.");
+      return;
+    }
+    setChecked(false);
+    setReview({record,decision});
+  }
+  function confirmDecision() {
+    if(!mayConfirm || !review || !activeRecord)return;
     if(MOCK_MODE) {
-      toast.info("هذا عرض تجريبي؛ لا توجد موافقات حقيقية");
+      setDemoDecisions((existing)=>({
+        ...existing,
+        [activeRecord.id]:review.decision==="approve"?"approved":"rejected",
+      }));
+      toast.info("محاكاة قرار داخل الواجهة فقط، لم يُحفَظ أو يُرسل أي شيء.");
+      setReview(null);
+      setChecked(false);
       return;
     }
-    if(!r.payloadDigest) {
-      toast.error("لا توجد بصمة للمحتوى — أعِد تحميل القائمة");
-      return;
-    }
-    const message = decision === "approve"
-      ? "هل اطلعت على النص كاملًا وتوافق على حفظ اعتماده كمسودة فقط؟ لن تُرسل رسالة أو يُنشر تعليق."
-      : "هل تريد رفض هذه المسودة؟";
-    if(!window.confirm(message)) return;
-    decide.mutate({id:r.id,decision,digest:r.payloadDigest});
+    // The backend revalidates immutable SHA-256 digest, status and expiry transactionally.
+    decide.mutate({
+      id:activeRecord.id,decision:review.decision,digest:activeRecord.payloadDigest!,
+    });
   }
 
   return (
     <>
-      <PageHeader title="طلبات الموافقة"
-        desc="كل اعتماد يخص نص مسودة محددة. لا يرسل النظام رسائل أو ينشر تعليقات بمجرد اعتمادها."
-        actions={<Button disabled={MOCK_MODE} onClick={() => setDisplayForm((x) => !x)}>
-          {displayForm ? "إغلاق النموذج" : "إنشاء مسودة مراجعة"}
-        </Button>}
-      />
-      {MOCK_MODE && <p className="mb-4 rounded-lg border border-amber-400/40 p-3 text-sm text-amber-700 dark:text-amber-300">
-        وضع تجريبي: الأمثلة الظاهرة ليست موافقات فعلية، ولا يتم تنفيذ أي إجراء خارجي.
-      </p>}
+      <PageHeader title="مركز الموافقات"
+        desc="مراجعة مسودات محددة مع فحص الصلاحية والمخاطر قبل حفظ أي قرار. اعتماد النص لا يشغّل رسالة أو منشورًا."
+        actions={<Button disabled={MOCK_MODE} onClick={()=>setDisplayForm((value)=>!value)}>
+          {displayForm?"إغلاق النموذج":"إنشاء مسودة مراجعة"}
+        </Button>} />
+
+      {MOCK_MODE && (
+        <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning" role="note">
+          <strong>مختبر موافقات تجريبي:</strong> يمكنك فتح مسودة، مراجعة نصها، ومحاكاة الاعتماد أو الرفض.
+          التغييرات مؤقتة داخل الصفحة ولا تُحفَظ في قاعدة البيانات أو تُرسل لأي منصة.
+          <Button size="sm" variant="outline" className="ms-3 mt-2 sm:mt-0"
+            onClick={()=>{setDemoDecisions({});setReview(null);setChecked(false);}}>
+            إعادة ضبط المحاكاة
+          </Button>
+        </div>
+      )}
       {displayForm && !MOCK_MODE && (
         <Panel title="إنشاء مسودة تتطلب اعتمادًا">
-          <p className="mb-3 text-xs text-muted-foreground">تظل هذه مسودة قابلة للمراجعة فقط. انتهاء الموافقة بعد ساعة واحدة، والقرارات لا تُنفّذ خارجيًا.</p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            تحفظ المسودة للمراجعة فقط، وتنتهي صلاحيتها بعد ساعة. لا يوجد محرك يرسلها خارجيًا.
+          </p>
           <div className="space-y-3">
             <label className="block text-sm" htmlFor="approval-kind">نوع الإجراء المقترح</label>
             <select id="approval-kind" className="w-full rounded-md border bg-background p-2 text-sm"
-              value={draft.kind} onChange={(e) => setDraft((d)=>({...d,kind:e.target.value as ApprovalKind}))}>
-              {(Object.keys(labels) as ApprovalKind[]).map((key)=><option key={key} value={key}>{labels[key]}</option>)}
+              value={draft.kind} onChange={(e)=>setDraft((v)=>({...v,kind:e.target.value as ApprovalKind}))}>
+              {(Object.keys(kinds) as ApprovalKind[]).map((key)=><option key={key} value={key}>{kinds[key]}</option>)}
             </select>
             <label className="block text-sm" htmlFor="approval-action">الإجراء</label>
-            <Input id="approval-action" value={draft.action} maxLength={120} placeholder="مثلاً: مراجعة مسودة رد"
-              onChange={(e)=>setDraft((d)=>({...d,action:e.target.value}))} />
+            <Input id="approval-action" value={draft.action} maxLength={120}
+              placeholder="مثلاً: مراجعة مسودة رد" onChange={(e)=>setDraft((v)=>({...v,action:e.target.value}))} />
             <label className="block text-sm" htmlFor="approval-target">الجهة أو الصفحة</label>
             <Input id="approval-target" value={draft.target} maxLength={240}
-              onChange={(e)=>setDraft((d)=>({...d,target:e.target.value}))} placeholder="اسم الجهة دون معلومات تسجيل الدخول" />
+              placeholder="اسم الجهة دون معلومات دخول" onChange={(e)=>setDraft((v)=>({...v,target:e.target.value}))} />
             <label className="block text-sm" htmlFor="approval-preview">النص الكامل للمراجعة</label>
-            <Textarea id="approval-preview" rows={4} maxLength={4000} value={draft.preview}
-              onChange={(e)=>setDraft((d)=>({...d,preview:e.target.value}))} />
+            <Textarea id="approval-preview" rows={5} maxLength={4000} value={draft.preview}
+              onChange={(e)=>setDraft((v)=>({...v,preview:e.target.value}))} />
             <Button disabled={create.isPending||!draft.action.trim()||!draft.target.trim()||!draft.preview.trim()}
-              onClick={submitDraft}>{create.isPending ? "جارٍ الحفظ…" : "حفظ المسودة للموافقة"}</Button>
+              onClick={submitDraft}>{create.isPending?"جارٍ الحفظ…":"حفظ المسودة للمراجعة"}</Button>
           </div>
         </Panel>
       )}
-      <div className="mt-4 space-y-3">
-        <QueryState q={q} empty="لا توجد مسودات تحتاج مراجعة">
-          {(rs) => rs.map((r) => (
-            <Panel key={r.id}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex items-center gap-2 font-medium">
-                    {r.action}
-                    <Pill tone={riskTone[r.risk]}>خطورة {riskLabel[r.risk]}</Pill>
+      <QueryState q={query} empty="لا توجد مسودات للمراجعة">
+        {() => (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="approval-summary">
+              {([
+                ["pending","معلقة",Clock3],
+                ["approved","معتمدة",CheckCircle2],
+                ["rejected","مرفوضة",XCircle],
+                ["expired","انتهت صلاحيتها",ShieldCheck],
+              ] as const).map(([status,label,Icon])=>(
+                <div key={status} className="flex items-center gap-3 rounded-lg border bg-card p-3">
+                  <div className="rounded-md bg-muted p-2"><Icon aria-hidden className="size-4 text-primary" /></div>
+                  <div><p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="font-mono text-2xl font-semibold tabular-nums">{counts[status]}</p>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {labels[r.kind]} · {r.target} · {fmtTime(r.createdAt)}
-                  </div>
-                  <blockquote className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words border-s-2 border-primary ps-3 text-sm">{r.preview}</blockquote>
-                  {r.expiresAt && <p className="text-xs text-muted-foreground">تنتهي صلاحية القرار: {fmtTime(r.expiresAt)}</p>}
-                  <p className="text-xs text-muted-foreground">الموافقة لا تمنح صلاحية إرسال أو تعديل حسابات؛ لا يوجد محرك تنفيذ خارجي.</p>
                 </div>
-                {r.status === "pending" ? (
-                  <div className="flex gap-2">
-                    <Button size="sm" disabled={decide.isPending||MOCK_MODE} onClick={() => decideDraft(r,"approve")}>اعتماد المسودة فقط</Button>
-                    <Button size="sm" variant="outline" disabled={decide.isPending||MOCK_MODE} onClick={() => decideDraft(r,"reject")}>رفض</Button>
-                  </div>
-                ) : (
-                  <Pill tone={r.status === "approved" ? "success" : r.status === "expired" ? "warning" : "danger"}>
-                    {r.status === "approved" ? "مسودة معتمدة" : r.status === "expired" ? "انتهت الصلاحية" : "مرفوضة"}
-                  </Pill>
-                )}
+              ))}
+            </div>
+            <Panel title="قائمة المسودات">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label htmlFor="approval-search" className="flex min-w-0 flex-1 items-center gap-2">
+                  <Search aria-hidden className="size-4 shrink-0 text-muted-foreground"/>
+                  <Input id="approval-search" aria-label="البحث في الموافقات"
+                    value={search} onChange={(e)=>setSearch(e.target.value)}
+                    placeholder="ابحث في الإجراء أو الوجهة أو نص المسودة…" />
+                </label>
+                <label htmlFor="approval-risk" className="flex items-center gap-2 text-xs">
+                  مستوى الخطورة
+                  <select id="approval-risk" aria-label="تصفية حسب مستوى الخطورة"
+                    value={riskFilter} onChange={(e)=>setRiskFilter(e.target.value as ApprovalRiskFilter)}
+                    className="rounded-md border bg-background px-2 py-2 text-sm">
+                    <option value="all">جميع المستويات</option>
+                    <option value="low">منخفضة</option>
+                    <option value="medium">متوسطة</option>
+                    <option value="high">عالية</option>
+                  </select>
+                </label>
               </div>
+              <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="تصفية الموافقات حسب الحالة">
+                <Button size="sm" variant={stateFilter==="all"?"default":"outline"}
+                  aria-pressed={stateFilter==="all"} onClick={()=>setStateFilter("all")}>
+                  الكل ({counts.total})
+                </Button>
+                {APPROVAL_STATES.map((status)=>(
+                  <Button key={status} size="sm" variant={stateFilter===status?"default":"outline"}
+                    aria-pressed={stateFilter===status} onClick={()=>setStateFilter(status)}>
+                    {APPROVAL_LABELS[status]} ({counts[status]})
+                  </Button>
+                ))}
+              </div>
+              <p aria-live="polite" className="mb-2 text-xs text-muted-foreground">
+                {visible.length} من {counts.total} مسودة
+              </p>
+              {visible.length ? (
+                <ul className="divide-y" data-testid="approval-list">
+                  {visible.map((record)=>{
+                    const effective = effectiveApprovalStatus(record);
+                    return (
+                      <li key={record.id} className="space-y-3 py-4" data-testid={"approval-"+record.id}>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="break-words font-semibold">{record.action}</h3>
+                            <p className="mt-1 break-words text-xs text-muted-foreground">
+                              {kinds[record.kind]} · {record.target} · {fmtTime(record.createdAt)}
+                            </p>
+                            {record.expiresAt && (
+                              <p className="mt-1 text-xs text-muted-foreground">تنتهي صلاحية القرار: {fmtTime(record.expiresAt)}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Pill tone={riskTone[record.risk]}>خطورة {RISK_LABELS[record.risk]}</Pill>
+                            <Pill tone={stateTone[effective]}>{APPROVAL_LABELS[effective]}</Pill>
+                          </div>
+                        </div>
+                        <details className="group">
+                          <summary className="cursor-pointer rounded-md border p-2 text-sm focus-visible:outline-2 focus-visible:outline-primary">
+                            قراءة نص المسودة بالكامل
+                          </summary>
+                          <blockquote className="mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap break-words border-s-2 border-primary p-3 text-sm">
+                            {record.preview}
+                          </blockquote>
+                          {record.payloadDigest && (
+                            <p className="mt-2 break-all font-mono text-[10px] text-muted-foreground" dir="ltr">
+                              SHA-256: {record.payloadDigest}
+                            </p>
+                          )}
+                        </details>
+                        {effective==="pending" ? (
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" disabled={decide.isPending}
+                              onClick={()=>openReview(record,"approve")}>
+                              {MOCK_MODE?"محاكاة اعتماد":"مراجعة واعتماد المسودة"}
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={decide.isPending}
+                              onClick={()=>openReview(record,"reject")}>
+                              {MOCK_MODE?"محاكاة رفض":"مراجعة ورفض"}
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            لا يمكن إصدار قرار جديد بشأن هذه المسودة.
+                            {MOCK_MODE && demoDecisions[record.id] ? " (حالة تجريبية غير محفوظة)" : ""}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">تسجيل الموافقة لا يمنح صلاحية الإرسال أو النشر أو تعديل الحساب.</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="rounded-md border border-dashed p-7 text-center text-sm text-muted-foreground" role="status">
+                  لا توجد مسودات تطابق البحث والفلاتر الحالية.
+                  <div className="mt-3">
+                    <Button size="sm" variant="outline" onClick={()=>{setStateFilter("all");setRiskFilter("all");setSearch("");}}>
+                      إعادة ضبط الفلاتر
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Panel>
-          ))}
-        </QueryState>
-      </div>
+          </div>
+        )}
+      </QueryState>
+
+      <Dialog open={!!review} onOpenChange={(open)=>{if(!open && !decide.isPending){setReview(null);setChecked(false);}}}>
+        <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{review?.decision==="approve"?"مراجعة اعتماد المسودة":"مراجعة رفض المسودة"}</DialogTitle>
+            <DialogDescription>
+              {MOCK_MODE?"محاكاة داخل المعاينة فقط، دون حفظ أي قرار.":"قرار يخص النص المعروض فقط ولا يؤدي لإرسال أو نشر شيء."}
+            </DialogDescription>
+          </DialogHeader>
+          {review && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Pill tone={riskTone[review.record.risk]}>خطورة {RISK_LABELS[review.record.risk]}</Pill>
+                <Pill tone={stateTone[effectiveApprovalStatus(review.record)]}>
+                  {APPROVAL_LABELS[effectiveApprovalStatus(review.record)]}
+                </Pill>
+              </div>
+              <p className="break-words text-sm font-medium">{review.record.action} — {review.record.target}</p>
+              <div className="max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-3 text-sm"
+                aria-label="النص الكامل للمسودة">
+                {review.record.preview}
+              </div>
+              {review.record.expiresAt && <p className="text-xs text-muted-foreground">صالحة حتى {fmtTime(review.record.expiresAt)}</p>}
+              {!unchanged && <p role="alert" className="text-sm text-destructive">تغيرت بيانات المسودة أثناء مراجعتها. أغلق النافذة وأعد فتح أحدث نسخة.</p>}
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm">
+                <Checkbox aria-label="أؤكد مراجعة نص المسودة" checked={checked}
+                  onCheckedChange={(value)=>setChecked(value===true)} />
+                <span>قرأت نص المسودة كاملًا وأفهم أن هذا القرار **لا يرسل رسالة ولا ينشر تعليقًا ولا يغيّر الحسابات**.</span>
+              </label>
+              <DialogFooter>
+                <Button variant="outline" disabled={decide.isPending} onClick={()=>{setReview(null);setChecked(false);}}>
+                  إلغاء
+                </Button>
+                <Button disabled={!mayConfirm} variant={review.decision==="reject"?"destructive":"default"}
+                  onClick={confirmDecision} aria-label="تأكيد قرار المسودة">
+                  {decide.isPending?"جارٍ تسجيل القرار…":MOCK_MODE?"تأكيد المحاكاة":review.decision==="approve"?"تسجيل اعتماد المسودة فقط":"تسجيل الرفض"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
