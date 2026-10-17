@@ -28,7 +28,18 @@ async function run(label, width, height) {
       const open = page.getByRole("button", { name: "فتح القائمة الرئيسية" });
       assert.ok(await open.isVisible(), label + ": mobile navigation exists");
       await open.click();
-      await page.getByRole("dialog").getByRole("link", { name: "المحادثة والمهام" }).click();
+      try {
+        await page.getByRole("dialog").getByRole("link", { name: "المحادثة والمهام" }).click({ timeout: 8000 });
+      } catch (err) {
+        console.error("Mobile navigation diagnostic:", JSON.stringify({
+          dialogs: await page.locator('[role="dialog"]').count(),
+          openButtons: await page.locator('[data-state="open"]').count(),
+          links: (await page.locator("a").allTextContents()).slice(0, 25),
+          dialogTexts: (await page.locator('[role="dialog"]').allTextContents()).slice(0, 3),
+          browserErrors: errors,
+        }));
+        throw err;
+      }
     } else {
       await page.getByRole("navigation", { name: "التنقل الرئيسي" })
         .getByRole("link", { name: "المحادثة والمهام" }).first().click();
