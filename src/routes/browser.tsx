@@ -138,13 +138,14 @@ function BrowserPage() {
           <label htmlFor="browser-instruction" className="block text-xs">اكتب المطلوب من المساعد في نفس التاب</label>
           <Textarea id="browser-instruction" value={instruction} onChange={e=>setInstruction(e.target.value)}
             disabled={MOCK_MODE||!!active} rows={5}
-            placeholder="مثال: اقرأ الصفحة الحالية ولخص المعلومات المهمة"/>
+            placeholder="مثال: انزل إلى نهاية الصفحة، أو افتح رابط الشروط داخل الموقع، أو لخص ما تراه"/>
           <Button className="w-full" disabled={!canReview||review.isPending}
-            onClick={()=>review.mutate()}>{review.isPending?"جارٍ البدء…":"تحليل الصفحة الحالية"}</Button>
+            onClick={()=>review.mutate()}>{review.isPending?"جارٍ البدء…":"ابدأ المهمة في هذا التاب"}</Button>
           <p className="text-xs text-muted-foreground">
-            <strong>المتاح الآن:</strong> قراءة التاب المصرّح به وتلخيصه عبر Ollama بعد تشغيل الخدمات المحلية.
-            <strong> النقر والكتابة وتنفيذ الإجراءات داخل المواقع لم تكتمل بعد.</strong>
-            لن تُعرض المهمة كمنفذة قبل تحققها.
+            <strong>المتاح في التشغيل المحلي:</strong> تلخيص الصفحة، التمرير، فتح روابط داخل نفس الموقع،
+            وملء حقول النص والبحث دون إرسال. يستخدم Ollama لتحديد الخطوة، ويتوقف بعد أربع خطوات كحد أقصى.
+            <strong> إرسال الرسائل، الضغط على أزرار التنفيذ، الدفع والحذف غير مدعوم تلقائيًا.</strong>
+            لا تظهر نتيجة حقيقية إلا بعد تشغيل المهمة على جهازك.
           </p>
           {active && <div role="status" className="space-y-2 rounded-md border p-3 text-xs">
             <p>المهمة قيد التشغيل: {active.title}</p>
@@ -164,7 +165,7 @@ function BrowserPage() {
           <p className="text-xs text-muted-foreground">الحالة الفعلية: {connected?state:"لا يوجد اتصال محلي"}</p>
           {connected&&canSend(state,"RESET")&&<Button className="w-full" variant="outline" disabled={pending} onClick={()=>void send({type:"RESET"})}><RefreshCw className="size-4"/> تفعيل المتصفح اليدوي</Button>}
           {connected&&canSend(state,"TAKE_OVER")&&<Button className="w-full" variant="outline" disabled={pending} onClick={()=>void send({type:"TAKE_OVER"})}><Hand className="size-4"/> استرجاع التحكم</Button>}
-          {!MOCK_MODE&&!aiReady&&<p className="text-xs text-muted-foreground">المساعد يحتاج تشغيل Ollama والتصريح للموقع المفتوح. الإعدادات المتقدمة ليست ضرورية لتصفح المواقع يدويًا.</p>}
+          {!MOCK_MODE&&!aiReady&&<p className="text-xs text-muted-foreground">المساعد يحتاج تشغيل Ollama وعامل Chromium المحلي. اختيار التاب والضغط على بدء المهمة هو التفويض المحدد لهذا الموقع؛ لا توجد حاجة لقائمة طويلة من المواقع.</p>}
           {MOCK_MODE&&<p className="text-xs text-muted-foreground">لا توجد جلسة متصفح أو مهمة فعلية في Lovable.</p>}
         </section>
       </aside>
