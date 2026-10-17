@@ -80,6 +80,8 @@ async function run(label, width, height) {
     await page.getByText("أرشفة المحادثات القديمة", { exact: true }).first().waitFor({ timeout: 10_000 });
     await page.getByTestId("task-detail-k3").locator("summary").click();
     await page.getByText("فتح التفاصيل لا يغيّر حالة المهمة", { exact: false }).first().waitFor({ timeout: 10_000 });
+    await page.getByText("[محاكاة فقط] مثال على التقرير النهائي", { exact: false }).waitFor({ timeout: 10_000 });
+    await page.getByText("معلومات عرض ثابتة وليست محتوى حسابات حقيقية", { exact: false }).waitFor({ timeout: 10_000 });
     await page.getByLabel("البحث في المهام").fill("عنصر غير موجود 8675309");
     await page.getByText("لا توجد مهام تطابق البحث", { exact: false }).waitFor({ timeout: 10_000 });
     await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).first().click();
