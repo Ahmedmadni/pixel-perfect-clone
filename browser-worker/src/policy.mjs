@@ -69,6 +69,6 @@ export function safeNavigationLink(value, label, origin) {
 }
 export function safeTextControl(tag, type, disabled, readOnly) {
   return !disabled && !readOnly && (
-    tag==="TEXTAREA" || (tag==="INPUT" && ["text","search"].includes(String(type).toLowerCase()))
+    tag==="TEXTAREA" || (tag==="INPUT" && ["","text","search"].includes(String(type).toLowerCase()))
   );
 }
