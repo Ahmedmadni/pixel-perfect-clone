@@ -35,7 +35,7 @@ export class BrowserGateway {
         method: body ? "POST" : "GET",
         headers: { Authorization: `Bearer ${this.token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}),
-        signal: AbortSignal.timeout(7_000),
+        signal: AbortSignal.timeout(20_000),
       });
     } catch {
       throw new BrowserWorkerUnavailable("Local browser worker unreachable");
@@ -51,11 +51,11 @@ export class BrowserGateway {
   }
   health() { return this.call<WorkerHealth>("/health"); }
   tabs() { return this.call<WorkerTab[]>("/tabs"); }
-  async handoff(state: WorkerHealth["mode"]) {
+  async handoff(state: WorkerHealth["mode"], tabId?: string) {
     const snapshot = await this.health();
     if (!snapshot.ready) throw new BrowserWorkerUnavailable("Chromium not ready");
     if (snapshot.mode === state) return snapshot;
-    return this.call<WorkerHealth>("/control", { state });
+    return this.call<WorkerHealth>("/control", { state, ...(tabId ? {tabId} : {}) });
   }
   async ensureManual() {
     const state = await this.health();
@@ -67,6 +67,22 @@ export class BrowserGateway {
   activateTab(tabId: string) { return this.call<{tabId: string}>("/tabs/activate", {tabId}); }
   closeTab(tabId: string) { return this.call<{closed: boolean}>("/tabs/close", {tabId}); }
   navigate(tabId: string, url: string) { return this.call<{tabId: string; url: string}>("/tabs/navigate", {tabId, url}); }
+  /** Scope-safe, non-destructive browser controls for the exact user-selected tab. */
+  snapshot(tabId: string) {
+    return this.call<{
+      tabId:string; title:string; url:string; untrustedPageText:string;
+      controls:{id:string;kind:"link"|"field"|"button";label:string;type:string;href:string|null}[];
+    }>("/agent/snapshot",{tabId});
+  }
+  agentAction(tabId:string, action:
+    | {action:"scroll";direction:"up"|"down"}
+    | {action:"follow_link";elementId:string}
+    | {action:"fill";elementId:string;text:string}
+    | {action:"navigate";url:string},
+  ) {
+    const paths={scroll:"/agent/scroll",follow_link:"/agent/follow-link",fill:"/agent/fill",navigate:"/agent/navigate"};
+    return this.call<{tabId:string;action?:string;url?:string}>(paths[action.action],{tabId,...action});
+  }
   /** Reads only an explicitly allowed HTTPS page. The worker rechecks both ownership and domain. */
   inspect(tabId: string) {
     return this.call<{ tabId: string; title: string; url: string; untrustedPageText: string }>(
