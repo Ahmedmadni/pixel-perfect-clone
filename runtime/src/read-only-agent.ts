@@ -125,7 +125,7 @@ export class ReadOnlyAgent {
         "ممنوع تخمين معرف عنصر غير موجود أو الانتقال لتبويب أو نطاق آخر.",
         "إذا كانت المهمة تتطلب زر إرسال أو تنفيذ حساس قل في finish إنها تحتاج تدخلًا يدويًا.",
         "إذا لم يبق خطوة آمنة، أنه المهمة بدل اختلاق نتيجة.",
-      ].join("\\n");
+      ].join("\n");
       const user=[
         "طلب المستخدم: "+task.objective.slice(0,1200),
         "التبويب الحالي: "+page.title.slice(0,150)+" — "+page.url.slice(0,500),
@@ -133,7 +133,7 @@ export class ReadOnlyAgent {
         "نص الصفحة غير الموثوق:", "<UNTRUSTED_PAGE>",
         page.untrustedPageText.slice(0,5000),"</UNTRUSTED_PAGE>",
         "العناصر التي يجوز اختيار معرف منها:",JSON.stringify(page.controls).slice(0,6000),
-      ].join("\\n");
+      ].join("\n");
       let raw="";
       for await(const chunk of this.ollama.chatStream(task.model,[
         {role:"system",content:system},{role:"user",content:user},
@@ -144,7 +144,7 @@ export class ReadOnlyAgent {
       }
       const plan=parseBrowserPlan(raw);
       if(plan.action==="finish"){
-        return (completed.length?"الخطوات المنفذة:\\n"+completed.join("\\n")+"\\n\\n":"")+plan.message;
+        return (completed.length?"الخطوات المنفذة:\n"+completed.join("\n")+"\n\n":"")+plan.message;
       }
       if(signal.aborted)throw new Error("Cancelled");
       const done=await this.browser.agentAction(task.tabId,plan);
@@ -156,7 +156,7 @@ export class ReadOnlyAgent {
       completed.push((i+1)+". "+actionDescription+(done.url?" — "+done.url:""));
       await step("inspect",actionDescription);
     }
-    return completed.join("\\n")+"\\nتوقف المساعد بعد أربع خطوات آمنة؛ قد تحتاج المهمة إلى استكمال أو تدخل يدوي.";
+    return completed.join("\n")+"\nتوقف المساعد بعد أربع خطوات آمنة؛ قد تحتاج المهمة إلى استكمال أو تدخل يدوي.";
   }
 
   private async execute(task: AgentTaskRecord, signal: AbortSignal) {
