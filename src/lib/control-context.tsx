@@ -3,7 +3,6 @@ import { toast } from "sonner";
 import { api, MOCK_MODE } from "./api/client";
 import {
   canSend,
-  controlReducer,
   initialControl,
   type ControlEvent,
   type ControlSnapshot,
@@ -24,7 +23,7 @@ const Ctx = createContext<ControlContextValue | null>(null);
 
 export function ControlProvider({ children }: { children: ReactNode }) {
   const [snap, setSnap] = useState<ControlSnapshot>(initialControl);
-  const [connected, setConnected] = useState(MOCK_MODE);
+  const [connected, setConnected] = useState(false);
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
   const requestEpoch = useRef(0);
@@ -60,16 +59,13 @@ export function ControlProvider({ children }: { children: ReactNode }) {
 
   const send = useCallback(async (event: ControlEvent) => {
     if (pendingRef.current) return;
+    if (MOCK_MODE) { toast.error("المعاينة غير متصلة بالمتصفح الحقيقي"); return; }
     if (!MOCK_MODE && !connected) {
       toast.error("لا يمكن تغيير التحكم دون اتصال مؤكد بالخادم المحلي");
       return;
     }
     if (!canSend(snap.state, event.type)) {
       toast.error(`انتقال غير مسموح: ${snap.state} ← ${event.type}`);
-      return;
-    }
-    if (MOCK_MODE) {
-      setSnap((current) => controlReducer(current, event));
       return;
     }
     pendingRef.current = true;
