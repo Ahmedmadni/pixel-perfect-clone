@@ -27,7 +27,7 @@ function SummaryItem({ label, count, icon: Icon }: {
 }
 
 /** Read-only task inspector. Filtering and expanding rows are entirely local UI state. */
-export function TaskMonitor({ tasks, preview, focusedTaskId }: { tasks: AgentTask[]; preview: boolean; focusedTaskId?: string }) {
+export function TaskMonitor({ tasks, preview, focusedTaskId }: { tasks: AgentTask[]; preview: boolean; focusedTaskId?: string | undefined }) {
   const [status, setStatus] = useState<TaskFilter>("all");
   const [search, setSearch] = useState("");
   const counts = summarizeTasks(tasks);
@@ -85,7 +85,7 @@ export function TaskMonitor({ tasks, preview, focusedTaskId }: { tasks: AgentTas
           <ul className="divide-y">
             {visible.map((t) => (
               <li key={t.id} className={t.id === focusedTaskId ? "rounded-md border border-primary/40 bg-primary/5 px-2 py-3" : "py-3"}>
-                <details key={t.id === focusedTaskId ? "focused" : "ordinary"} defaultOpen={t.id === focusedTaskId}
+                <details key={t.id === focusedTaskId ? "focused" : "ordinary"} open={t.id === focusedTaskId ? true : undefined}
                   className="group" data-testid={"task-detail-" + t.id}>
                   <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-md px-1 py-2 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0 flex-1">
