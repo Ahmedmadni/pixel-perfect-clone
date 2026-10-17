@@ -14,7 +14,7 @@ const dict = {
   reports: { ar: "التقارير والسجلات", en: "Reports & Logs" },
   settings: { ar: "إعدادات النظام", en: "Settings" },
   emergencyStop: { ar: "إيقاف طارئ", en: "Emergency stop" },
-  mockMode: { ar: "وضع تجريبي — بيانات وهمية", en: "Mock mode — fake data" },
+  mockMode: { ar: "معاينة بدون اتصال", en: "Mock mode — fake data" },
   appName: { ar: "مساحة العمل الذكية", en: "Personal AI Workspace" },
 } as const;
 export type DictKey = keyof typeof dict;
