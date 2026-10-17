@@ -21,6 +21,8 @@ async function run(label, width, height) {
     const response = await page.goto(base, { waitUntil: "domcontentloaded", timeout: 40_000 });
     assert.equal(response?.status(), 200, label + ": index request");
     await page.getByText("معاينة تجريبية للواجهة", { exact: false }).first().waitFor({ timeout: 20_000 });
+    // SSR markup is visible before React attaches event handlers. Wait for true hydration.
+    await page.locator('[data-app-ready="true"]').waitFor({timeout: 20_000});
     assert.equal(await page.locator("html").getAttribute("dir"), "rtl");
     assert.ok(await page.getByText("أنت تستعرض واجهة المشروع", { exact: false }).count() > 0,
       label + ": preview must not claim live account access");
