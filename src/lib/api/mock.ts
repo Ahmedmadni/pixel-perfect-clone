@@ -43,9 +43,25 @@ export const mock = {
     { id: "m3", role: "assistant", content: "[تجريبي] سأحتاج إلى تشغيل المتصفح المحلي أولاً.", at: ago(18) },
   ],
   tasks: (): AgentTask[] => [
-    { id: "k1", title: "تلخيص الرسائل غير المقروءة", status: "queued", createdAt: ago(18) },
-    { id: "k2", title: "الرد على تعليقات الصفحة", status: "awaiting_approval", createdAt: ago(60) },
-    { id: "k3", title: "أرشفة المحادثات القديمة", status: "done", createdAt: ago(300) },
+    {
+      id: "k1", title: "تلخيص الرسائل غير المقروءة", status: "queued", createdAt: ago(18),
+      objective: "[محاكاة] عرض خطوات تلخيص افتراضي دون فتح واتساب أو قراءة رسائل حقيقية",
+    },
+    {
+      id: "k2", title: "الرد على تعليقات الصفحة", status: "awaiting_approval", createdAt: ago(60),
+      objective: "[محاكاة] مسودة رد توضيحية فقط؛ لا يوجد نشر أو موافقة حقيقية",
+      steps: [{at:ago(59),phase:"عرض تجريبي",detail:"تم إنشاء مثال ثابت لطلب موافقة؛ لا يوجد اتصال بمنصة خارجية"}],
+    },
+    {
+      id: "k3", title: "أرشفة المحادثات القديمة", status: "done", createdAt: ago(300), finishedAt: ago(298),
+      objective: "[محاكاة] استعراض شكل سجل مهمة مكتملة دون بيانات شخصية",
+      result: "[محاكاة فقط] مثال على التقرير النهائي لمهمة مكتملة. لم تُفتح محادثات أو تُحفظ بيانات حسابات.",
+      steps: [
+        {at:ago(300),phase:"بدء المثال",detail:"بدء سيناريو واجهة افتراضي بالكامل"},
+        {at:ago(299),phase:"المراجعة",detail:"معلومات عرض ثابتة وليست محتوى حسابات حقيقية"},
+        {at:ago(298),phase:"الانتهاء",detail:"اكتمال نموذج الشرح داخل المعاينة فقط"},
+      ],
+    },
   ],
   accounts: (): BrowserAccount[] => [
     { id: "a1", platform: "whatsapp", label: "واتساب الشخصي", profileId: "p-main", session: "unknown", lastCheckedAt: null, canAgentControl: false },
