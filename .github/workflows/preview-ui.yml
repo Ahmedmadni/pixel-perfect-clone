@@ -8,6 +8,9 @@ on:
       - 'package.json'
       - 'bun.lock'
       - 'browser-worker/test/preview-e2e.mjs'
+      - 'browser-worker/test/agent-operations.test.mjs'
+      - 'browser-worker/src/agent-operations.mjs'
+      - 'browser-worker/src/policy.mjs'
       - '.github/workflows/preview-ui.yml'
   workflow_dispatch:
 
@@ -39,7 +42,7 @@ jobs:
           docker run --rm --network host --ipc host \
             -v "$PWD/browser-worker:/tests" -w /tests \
             mcr.microsoft.com/playwright:v1.64.0-noble \
-            sh -c 'npm install --no-audit --no-fund && PAW_PREVIEW_URL=http://127.0.0.1:8080 node test/preview-e2e.mjs'
+            sh -c 'npm install --no-audit --no-fund && PAW_PREVIEW_URL=http://127.0.0.1:8080 node test/preview-e2e.mjs && node --test test/agent-operations.test.mjs'
       - name: Frontend diagnostics on failure
         if: failure()
         run: |
