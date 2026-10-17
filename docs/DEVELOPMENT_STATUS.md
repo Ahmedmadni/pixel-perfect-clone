@@ -1,5 +1,5 @@
 # تقرير تقدم Personal AI Workspace
-**آخر تحديث: 2026-10-16** · المستودع: `Ahmedmadni/pixel-perfect-clone` · الفرع: `main`.
+**آخر تحديث: 2026-10-17** · المستودع: `Ahmedmadni/pixel-perfect-clone` · الفرع: `main`.
 
 ## الوضع الحالي
 
@@ -151,6 +151,24 @@
   ضمانات لنقل جلسة مصادقة بين الأجهزة.
 
 دليل الأمان: [CHROMIUM_PROFILE_BACKUPS.md](CHROMIUM_PROFILE_BACKUPS.md).
+
+## جاهزية المعاينة في Lovable — 17 أكتوبر 2026
+
+- تمت معالجة تعارض `lovable-sync` مع `main` عبر
+  [Merge Commit f1d47cb](https://github.com/Ahmedmadni/pixel-perfect-clone/commit/f1d47cb3a0c9bbe0e315749609161749e5e10bb5)
+  يحفظ التاريخين دون إسقاط ملفات `main`. ظهر لدى المستخدم `In sync with GitHub`
+  وتأكد الاتصال من وصول Lovable إلى نفس Merge Commit.
+- أُضيفت محادثة تجريبية تفاعلية واضحة الوسم باستخدام ردود محلية ثابتة،
+  لتجربة فقاعات المحادثة والكتابة بالعربية دون شبكة أو Ollama.
+- أُضيف اختبار متصفح حقيقي للموبايل (390px) والكمبيوتر (1440px)
+  يتحقق من RTL والتنقل والقائمة الجانبية وتجربة المحادثة ومسحها وحماية
+  رمز الخادم المحلي، مع انتظار تفعيل React بعد SSR قبل النقر.
+- **نجح اختبار الواجهة التفاعلي**:
+  https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/39019116214
+- **نجحت فحوص النظام وقاعدة البيانات والمتصفح** على نفس Commit:
+  https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/39019116239
+- المعاينة السحابية لا تُثبت عمل نموذج Ollama حقيقي أو جلسات مستخدم؛
+  التشغيل على Windows ما زال اختبارًا مستقلًا غير منفّذ.
 
 ## المتبقي الضروري
 
