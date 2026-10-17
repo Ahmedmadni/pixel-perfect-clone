@@ -3,7 +3,7 @@ import { connect } from "node:net";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { chromium } from "playwright";
-import { canOperate, validHandoff, validateBrowserUrl } from "./policy.mjs";
+import { canOperate, validHandoff, validateBrowserUrl, agentOrigin, validateScopedAgentUrl, safeNavigationLink, safeTextControl } from "./policy.mjs";
 
 const token = process.env.BROWSER_WORKER_TOKEN ?? "";
 if (token.length < 32) throw new Error("BROWSER_WORKER_TOKEN must be at least 32 characters");
@@ -21,6 +21,7 @@ let mode = "STOPPED"; // Fail-closed on every start/restart.
 let generation = 0;
 let context;
 let activePage = null;
+let agentScope = null; // Only the selected tab and exact HTTPS origin
 let ciProfileRecovered = false;
 const ids = new WeakMap();
 let queue = Promise.resolve();
@@ -99,15 +100,23 @@ function browserHealth() {
   return {
     ready: Boolean(context), mode, viewOnly: mode !== "MANUAL",
     tabs: context ? pages().length : 0,
-    agentRunnerReady: enableReadOnlyAgent && Boolean(context) && allowedDomains.length > 0,
+    agentRunnerReady: enableReadOnlyAgent && Boolean(context) && !trustedCiSmoke,
     // A disposable dummy cookie is exposed as a boolean ONLY to explicitly opted-in offline CI.
     ...(trustedCiSmoke ? { ciProfileRecovered } : {}),
   };
 }
 
-async function setMode(target) {
+async function setMode(target, tabId = null) {
   if (!validHandoff(mode, target)) throw new Error("invalid_handoff");
   // Mark pending agent work invalid BEFORE changing VNC's keyboard/mouse lock.
+  if (target === "AGENT_ACTIVE" && mode === "MANUAL") {
+    const tab = tabId ? findPage(tabId) : null;
+    if (!tab || tab !== activePage) throw new Error("agent_tab_not_selected");
+    const origin = agentOrigin(tab.url());
+    if (allowedDomains.length) validateBrowserUrl(tab.url(), true, allowedDomains);
+    agentScope = {tabId, origin};
+  }
+  if (target === "MANUAL" || target === "STOPPED") agentScope = null;
   generation++;
   if (target === "MANUAL") {
     vncViewOnly(false);
@@ -116,6 +125,7 @@ async function setMode(target) {
       vncViewOnly(true);
     } catch (error) {
       mode = "STOPPED";
+      agentScope = null;
       throw error;
     }
   }
@@ -129,6 +139,11 @@ async function operation(data, actor, action) {
   const generationAtStart = generation;
   const page = data.tabId ? findPage(data.tabId) : pages().at(-1);
   if (!page && action !== "new") throw new Error("no_tab");
+  if (actor === "agent") {
+    if (!agentScope || !data.tabId || agentScope.tabId !== data.tabId || page !== activePage)
+      throw new Error("agent_tab_not_selected");
+    validateScopedAgentUrl(page.url(), agentScope.origin);
+  }
   if (action === "new") {
     const p = await context.newPage();
     await p.bringToFront();
@@ -150,14 +165,14 @@ async function operation(data, actor, action) {
     return { closed: true };
   }
   if (action === "navigate") {
-    const url = validateBrowserUrl(data.url, actor === "agent", allowedDomains);
+    const url = actor === "agent" ? validateScopedAgentUrl(data.url, agentScope.origin) : validateBrowserUrl(data.url);
     // Redirects are checked too. Main-frame navigation may not escape approved
     // HTTPS domains; third-party subresources are not treated as new top-level sites.
     const guard = async (route) => {
       try {
         const request = route.request();
         if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
-          validateBrowserUrl(request.url(), true, allowedDomains);
+          validateScopedAgentUrl(request.url(), agentScope.origin);
         }
         await route.continue();
       } catch {
@@ -175,7 +190,7 @@ async function operation(data, actor, action) {
   }
   if (action === "inspect") {
     // Do not inspect login/account pages without explicit domain allowlist.
-    validateBrowserUrl(page.url(), true, allowedDomains);
+    validateScopedAgentUrl(page.url(), agentScope.origin);
     const title = await page.title();
     const text = (await page.locator("body").innerText({ timeout: 5000 }).catch(() => "")).slice(0, 12000);
     if (generationAtStart !== generation) throw new Error("ownership_changed");
@@ -210,7 +225,7 @@ async function handle(req, res) {
     if (data.state === "AGENT_ACTIVE" && !enableReadOnlyAgent) return json(res, 409, { error: "agent_disabled" });
     if (typeof data.state !== "string") return json(res, 400, { error: "invalid_control" });
     // For STOP, apply immediately; don't wait for a pending read-only agent task.
-    return json(res, 200, await setMode(data.state));
+    return json(res, 200, await setMode(data.state, data.tabId));
   }
   const commands = {
     "/tabs/new": ["user", "new"],
@@ -219,6 +234,10 @@ async function handle(req, res) {
     "/tabs/navigate": ["user", "navigate"],
     "/agent/inspect": ["agent", "inspect"],
     "/agent/navigate": ["agent", "navigate"],
+    "/agent/snapshot": ["agent", "snapshot"],
+    "/agent/scroll": ["agent", "scroll"],
+    "/agent/follow-link": ["agent", "follow_link"],
+    "/agent/fill": ["agent", "fill"],
   };
   const tuple = commands[pathname];
   if (!tuple) return json(res, 404, { error: "unknown_route" });
@@ -230,8 +249,8 @@ async function handle(req, res) {
 const server = createServer((req, res) => {
   void handle(req, res).catch((e) => {
     const error = String(e?.message ?? "worker_error");
-    const denied = /^(control_not_owned|invalid_handoff|agent_disabled|agent_domain_not_approved|agent_requires_https|ownership_changed)$/.test(error);
-    const invalid = /^(invalid_url|bad_json|body_too_large|unknown_tab|no_tab|last_tab_cannot_close)$/.test(error);
+    const denied = /^(control_not_owned|invalid_handoff|agent_disabled|agent_domain_not_approved|agent_requires_https|ownership_changed|agent_private_domain_forbidden|agent_left_selected_site|agent_tab_not_selected|agent_action_requires_manual_review)$/.test(error);
+    const invalid = /^(invalid_url|bad_json|body_too_large|unknown_tab|no_tab|last_tab_cannot_close|invalid_agent_action|element_not_found)$/.test(error);
     json(res, denied ? 409 : invalid ? 400 : 503, { error: denied || invalid ? error : "browser_worker_unavailable" });
   });
 });
@@ -263,6 +282,9 @@ async function start() {
       }]);
     }
   }
+  context.on("page",(tab)=>{
+    if (mode === "AGENT_ACTIVE") void tab.close().catch(()=>{});
+  });
   context.setDefaultTimeout(10_000);
   context.setDefaultNavigationTimeout(12_000);
   if (!pages().length) await context.newPage();
