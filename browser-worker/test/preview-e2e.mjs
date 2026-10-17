@@ -139,6 +139,38 @@ async function run(label, width, height) {
     assert.equal(await page.getByTestId("approval-r5").getByRole("button", { name: "محاكاة اعتماد" }).count(), 0,
       label + ": an expired draft must not be confirmable");
 
+    // Navigate safely between reports and approval lists, without inventing draft-task relationships.
+    if (width < 768) {
+      await page.getByRole("button", { name: "فتح القائمة الرئيسية" }).click();
+      await page.getByRole("dialog").getByRole("link", { name: "التقارير والسجلات" }).click();
+    } else {
+      await page.getByRole("navigation", { name: "التنقل الرئيسي" })
+        .getByRole("link", { name: "التقارير والسجلات" }).first().click();
+    }
+    const awaitingTask = page.getByTestId("task-detail-k2");
+    await awaitingTask.locator("summary").click();
+    await awaitingTask.getByRole("link", {
+      name: "عرض جميع المسودات المعلقة (وليست بالضرورة مرتبطة بهذه المهمة)",
+    }).click();
+    await page.getByText("هذه القائمة لا تثبت أن أي مسودة مرتبطة بمهمة محددة", { exact: false })
+      .waitFor({timeout:10_000});
+    assert.equal(await page.getByRole("button", { name: "بانتظار المراجعة (2)" }).getAttribute("aria-pressed"), "true");
+    assert.equal(await page.getByTestId("approval-r3").count(), 0,
+      label + ": pending list must not include approved draft");
+    await page.getByRole("link", { name: "العودة إلى التقارير" }).click();
+
+    // Notifications have genuine task IDs: open the precise record and nothing else.
+    await page.getByRole("link", { name: "عرض المهمة المرتبطة بالتنبيه" }).click();
+    await page.getByText("تم تحديد المهمة المرتبطة بالتنبيه", { exact: false })
+      .waitFor({timeout:10_000});
+    const linkedTask = page.getByTestId("task-detail-k3");
+    await linkedTask.getByText("[محاكاة فقط] مثال على التقرير النهائي", { exact: false })
+      .waitFor({timeout:10_000});
+    await page.goto(base + "/reports?taskId=not-present", {waitUntil:"domcontentloaded"});
+    await page.locator('[data-app-ready="true"]').waitFor({timeout:20_000});
+    await page.getByText("لم تظهر المهمة المطلوبة ضمن أحدث السجلات", {exact:false})
+      .waitFor({timeout:10_000});
+
     const overflow = await page.evaluate(() => ({
       doc: document.documentElement.scrollWidth,
       width: window.innerWidth,
