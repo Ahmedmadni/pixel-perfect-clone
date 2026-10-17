@@ -91,6 +91,38 @@ async function run(label, width, height) {
     await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).last().click();
     await page.getByText("تم تحميل الواجهة في الوضع التجريبي", { exact: false }).waitFor({ timeout: 10_000 });
 
+    // Safe approval centre: only ephemeral preview decisions; no backend or account writes.
+    if (width < 768) {
+      await page.getByRole("button", { name: "فتح القائمة الرئيسية" }).click();
+      await page.getByRole("dialog").getByRole("link", { name: "الموافقات والتنبيهات" }).click();
+    } else {
+      await page.getByRole("navigation", { name: "التنقل الرئيسي" })
+        .getByRole("link", { name: "الموافقات والتنبيهات" }).first().click();
+    }
+    await page.getByText("مختبر موافقات تجريبي", { exact: false }).first().waitFor({ timeout: 15_000 });
+    await page.getByTestId("approval-list").waitFor({ timeout: 15_000 });
+    const example = page.getByTestId("approval-r1");
+    await example.getByRole("button", { name: "محاكاة اعتماد" }).click();
+    const decision = page.getByRole("dialog");
+    await decision.getByText("مراجعة اعتماد المسودة").waitFor({ timeout: 10_000 });
+    await decision.getByText("هذه مسودة غير حقيقية", { exact: false }).waitFor({ timeout: 10_000 });
+    const confirm = decision.getByRole("button", { name: "تأكيد قرار المسودة" });
+    assert.equal(await confirm.isDisabled(), true, label + ": approval requires explicit review");
+    await decision.getByRole("checkbox", { name: "أؤكد مراجعة نص المسودة" }).click();
+    assert.equal(await confirm.isEnabled(), true, label + ": check enables local preview only");
+    await confirm.click();
+    await example.getByText("مسودة معتمدة", { exact: true }).waitFor({ timeout: 10_000 });
+    await example.getByText("حالة تجريبية غير محفوظة", { exact: false }).waitFor({ timeout: 10_000 });
+    await page.getByRole("button", { name: "إعادة ضبط المحاكاة" }).click();
+    await example.getByRole("button", { name: "محاكاة اعتماد" }).waitFor({ timeout: 10_000 });
+    await page.getByLabel("البحث في الموافقات").fill("نص غير موجود 8675309");
+    await page.getByText("لا توجد مسودات تطابق البحث", { exact: false }).waitFor({ timeout: 10_000 });
+    await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).click();
+    await page.getByRole("button", { name: "منتهية الصلاحية (1)" }).click();
+    await page.getByTestId("approval-r5").getByText("انتهت وقت مراجعة هذا المثال", { exact: false }).count().then((count) => assert.equal(count, 0));
+    assert.equal(await page.getByTestId("approval-r5").getByRole("button", { name: "محاكاة اعتماد" }).count(), 0,
+      label + ": an expired draft must not be confirmable");
+
     const overflow = await page.evaluate(() => ({
       doc: document.documentElement.scrollWidth,
       width: window.innerWidth,
