@@ -55,6 +55,8 @@ $runtimeTemplate = Replace-Env $runtimeTemplate "BROWSER_WORKER_TOKEN" $workerTo
 $workerTemplate = [System.IO.File]::ReadAllText((Join-Path $root "browser-worker\.env.example"))
 $workerTemplate = Replace-Env $workerTemplate "BROWSER_WORKER_TOKEN" $workerToken
 $workerTemplate = Replace-Env $workerTemplate "VNC_PASSWORD" $vncPass
+# Local-only worker: each task is started by the user and pinned to its active HTTPS tab.
+$workerTemplate = Replace-Env $workerTemplate "BROWSER_ENABLE_READONLY_AGENT" "true"
 $frontendTemplate = @"
 VITE_MOCK_MODE=false
 VITE_LOCAL_API_URL=http://127.0.0.1:4100
