@@ -1,7 +1,6 @@
 /**
  * Local API client. Talks to the Fastify runtime on the user's machine.
- * In mock mode NOTHING is sent anywhere; responses come from ./mock and the
- * UI labels them as mock data. Mock mode is never presented as a real integration.
+ * Hosted preview only displays EMPTY states: never simulate users, sites or actions.
  */
 import { mock } from "./mock";
 import { isLocalBrowserOrigin } from "./origin";
@@ -90,7 +89,7 @@ export const api = {
   health: () => request<HealthResponse>("/v1/health", undefined, mock.health),
   agentStatus: () => request<AgentStatus>("/v1/agent/status", undefined, mock.agentStatus),
   sendControl: (event: ControlEvent) =>
-    request<{ ok: true; snapshot?: ControlSnapshot }>("/v1/agent/control", post(event), () => ({ ok: true as const })),
+    request<{ ok: true; snapshot?: ControlSnapshot }>("/v1/agent/control", post(event)),
   browserTabs: () => request<BrowserTab[]>("/v1/browser/tabs", undefined, mock.tabs),
   browserAction: (action: BrowserTabAction) => request<{ tabId?: string; closed?: boolean; url?: string }>("/v1/browser/tabs", post(action)),
   chatHistory: async () => (await request<{ messages: ChatMessage[]; nextBefore: number | null }>("/v1/chat/messages", undefined, () => ({ messages: mock.chat(), nextBefore: null }))).messages,
@@ -116,11 +115,7 @@ export const api = {
     request<ApprovalRequest>("/v1/approvals", post(draft)),
   decide: (id: string, decision: "approve" | "reject", expectedDigest: string) =>
     request<ApprovalRequest>(`/v1/approvals/${encodeURIComponent(id)}`,
-      post({ decision, expectedDigest }),
-      () => ({
-        ...mock.approvals().find((item) => item.id === id)!,
-        status: decision === "approve" ? "approved" as const : "rejected" as const,
-      })),
+      post({ decision, expectedDigest })),
   knowledge: () => request<KnowledgeItem[]>("/v1/knowledge"),
   knowledgeCreate: (draft: Pick<KnowledgeItem, "category" | "title" | "body" | "tags">) =>
     request<KnowledgeItem>("/v1/knowledge", post(draft)),
