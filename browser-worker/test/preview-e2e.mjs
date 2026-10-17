@@ -21,11 +21,11 @@ async function verify(label,width,height) {
     assert.equal(await page.locator("html").getAttribute("dir"),"rtl");
     await page.getByText("لا توجد تبويبات متصلة").waitFor({timeout:15000});
     await page.getByText("المتصفح غير متصل في المعاينة").waitFor({timeout:15000});
-    await page.getByText("النقر والكتابة وتنفيذ الإجراءات داخل المواقع لم تكتمل بعد",{exact:false}).waitFor({timeout:15000});
+    await page.getByText("إرسال الرسائل، الضغط على أزرار التنفيذ، الدفع والحذف غير مدعوم تلقائيًا",{exact:false}).waitFor({timeout:15000});
     assert.ok(await page.getByLabel("عنوان الموقع").isDisabled(),label+": no fake navigation");
     assert.ok(await page.getByLabel("تبويب جديد").isDisabled(),label+": no imaginary tabs");
     assert.ok(await page.locator("#browser-instruction").isDisabled(),label+": no imaginary assistant reply");
-    assert.ok(await page.getByRole("button",{name:"تحليل الصفحة الحالية"}).isDisabled(),label+": no pretend AI");
+    assert.ok(await page.getByRole("button",{name:"ابدأ المهمة في هذا التاب"}).isDisabled(),label+": no pretend AI");
     for(const forbidden of ["WhatsApp Web","فيسبوك — صفحة افتراضية","محاكاة للواجهة فقط","تلخيص الرسائل غير المقروءة"]) {
       assert.equal(await page.getByText(forbidden,{exact:true}).count(),0,label+": no fake "+forbidden);
     }
