@@ -50,7 +50,7 @@ function SettingsPage() {
       <PageHeader title="إعدادات النظام" desc="تُضبط عناوين الخدمات عبر ملف .env.local، ورمز الخادم من هذه الصفحة." />
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="الاتصال المحلي">
-          <Row k="وضع البيانات" v={MOCK_MODE ? <Pill tone="warning">تجريبي (Mock)</Pill> : <Pill tone="neutral">محاولة الاتصال المحلي</Pill>} />
+          <Row k="وضع البيانات" v={MOCK_MODE ? <Pill tone="warning">معاينة بلا بيانات</Pill> : <Pill tone="neutral">محاولة الاتصال المحلي</Pill>} />
           <Row k="VITE_LOCAL_API_URL" v={<code dir="ltr" className="max-w-full break-all font-mono text-xs">{API_BASE}</code>} />
           <Row k="VITE_NOVNC_URL" v={<code dir="ltr" className="max-w-full break-all font-mono text-xs">{NOVNC_URL}</code>} />
         </Panel>
