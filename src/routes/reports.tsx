@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { reportsSearch } from "@/lib/workspace-links";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Search } from "lucide-react";
@@ -12,6 +13,7 @@ import { PageHeader, Panel, Pill, QueryState, fmtTime } from "@/components/works
 
 export const Route = createFileRoute("/reports")({
   head: pageHead("مركز المهام والتقارير", "Read-only task inspection, activity logs and local notifications."),
+  validateSearch: reportsSearch,
   component: ReportsPage,
 });
 
@@ -19,6 +21,7 @@ const levelTone = { info: "info", warn: "warning", error: "danger", audit: "prim
 const levelLabel = { all: "الكل", audit: "تدقيق", info: "معلومات", warn: "تنبيه", error: "خطأ" } as const;
 
 function ReportsPage() {
+  const {taskId} = Route.useSearch();
   const qc = useQueryClient();
   const logs = useQuery({ queryKey: ["logs"], queryFn: api.logs, refetchInterval: 10000, retry: 0 });
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks, refetchInterval: 10000, retry: 0 });
@@ -40,7 +43,7 @@ function ReportsPage() {
       />
       <div className="space-y-5">
         <QueryState q={tasks} empty="لا توجد مهام مسجّلة في هذه المساحة.">
-          {(items) => <TaskMonitor tasks={items} preview={MOCK_MODE} />}
+          {(items) => <TaskMonitor tasks={items} preview={MOCK_MODE} focusedTaskId={taskId} />}
         </QueryState>
 
         <Panel title="تنبيهات المهام المحلية">
@@ -58,6 +61,13 @@ function ReportsPage() {
                         <span className={notice.readAt ? "break-words text-muted-foreground" : "break-words font-medium"}>{notice.message}</span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">{fmtTime(notice.createdAt)}</p>
+                      {notice.taskId && (
+                        <Link to="/reports" search={{taskId:notice.taskId}}
+                          className="mt-2 inline-flex rounded-md border px-3 py-1.5 text-xs text-primary hover:bg-muted"
+                          aria-label="عرض المهمة المرتبطة بالتنبيه">
+                          عرض تفاصيل المهمة المرتبطة
+                        </Link>
+                      )}
                     </div>
                     {!notice.readAt && !MOCK_MODE && (
                       <Button size="sm" variant="outline" disabled={markRead.isPending}
