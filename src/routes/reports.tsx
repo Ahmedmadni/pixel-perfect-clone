@@ -38,7 +38,7 @@ function ReportsPage() {
       <PageHeader
         title="مركز المهام والتقارير"
         desc={MOCK_MODE
-          ? "استعرض وتصفّح مهامًا وسجلات تجريبية داخل Lovable دون تشغيل أي إجراء."
+          ? "لا توجد مهام أو سجلات فعلية في Lovable؛ ستظهر فقط بيانات الخدمات المحلية بعد توصيلها."
           : "متابعة حالة المهام الفعلية وسجل التدقيق والتنبيهات من الخدمات المحلية، دون تغيير حالة أي مهمة."}
       />
       <div className="space-y-5">
@@ -47,7 +47,7 @@ function ReportsPage() {
         </QueryState>
 
         <Panel title="تنبيهات المهام المحلية">
-          {MOCK_MODE && <p className="mb-3 text-xs text-warning" role="note">هذه أمثلة فقط؛ لا توجد تنبيهات فعلية ولا يمكن تغيير حالة إشعار من المعاينة.</p>}
+          {MOCK_MODE && <p className="mb-3 text-xs text-warning" role="note">لا توجد تنبيهات متصلة من الخادم المحلي في المعاينة.</p>}
           <QueryState q={notices} empty="لا توجد إشعارات بعد">
             {(items) => (
               <ul className="divide-y">
@@ -82,7 +82,7 @@ function ReportsPage() {
         </Panel>
 
         <Panel title="سجل النشاط والتدقيق">
-          {MOCK_MODE && <p className="mb-3 text-xs text-warning" role="note">السجلات المعروضة أمثلة مُولّدة للتصميم وليست عمليات على حساباتك.</p>}
+          {MOCK_MODE && <p className="mb-3 text-xs text-warning" role="note">لا توجد سجلات نشاط محلية متصلة داخل Lovable.</p>}
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <label htmlFor="activity-log-search" className="flex min-w-0 flex-1 items-center gap-2">
               <Search className="size-4 shrink-0 text-muted-foreground" />
