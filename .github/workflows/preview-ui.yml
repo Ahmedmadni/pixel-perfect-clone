@@ -1,0 +1,50 @@
+name: Lovable Preview UI Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'browser-worker/test/preview-e2e.mjs'
+      - '.github/workflows/preview-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    name: Real Chromium Arabic preview (mobile and desktop)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install locked frontend packages
+        run: bun install --frozen-lockfile
+      - name: Start frontend preview in isolated mock mode
+        run: |
+          VITE_MOCK_MODE=true bun run dev --host 0.0.0.0 --port 8080 > /tmp/paw-preview.log 2>&1 &
+          echo $! > /tmp/paw-preview.pid
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/ > /dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          if [ "$ok" -ne 1 ]; then cat /tmp/paw-preview.log; exit 1; fi
+      - name: Exercise real Chromium mobile and desktop UI without accounts
+        run: |
+          docker run --rm --network host --ipc host \
+            -v "$PWD/browser-worker:/tests" -w /tests \
+            mcr.microsoft.com/playwright:v1.64.0-noble \
+            sh -c 'npm install --no-audit --no-fund && PAW_PREVIEW_URL=http://127.0.0.1:8080 node test/preview-e2e.mjs'
+      - name: Frontend diagnostics on failure
+        if: failure()
+        run: |
+          tail -n 160 /tmp/paw-preview.log || true
+      - name: Shutdown transient frontend
+        if: always()
+        run: |
+          if [ -f /tmp/paw-preview.pid ]; then kill "$(cat /tmp/paw-preview.pid)" || true; fi
