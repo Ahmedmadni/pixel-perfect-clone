@@ -73,8 +73,31 @@ export const mock = {
     { id: "s2", title: "نشر تذكير أسبوعي", cron: "0 18 * * 4", enabled: false, nextRunAt: null, requiresApproval: true },
   ],
   approvals: (): ApprovalRequest[] => [
-    { id: "r1", kind: "external_message", action: "إرسال رسالة", target: "واتساب — أحمد", preview: "شكراً لك، سأراجع الملف وأرد عليك غداً.", risk: "medium", createdAt: ago(5), status: "pending" },
-    { id: "r2", kind: "publish_comment", action: "نشر تعليق", target: "فيسبوك — منشور الصفحة", preview: "نسعد بخدمتكم دائماً 🌿", risk: "high", createdAt: ago(42), status: "pending" },
+    {
+      id: "r1", kind: "external_message", action: "مراجعة رسالة تجريبية",
+      target: "واتساب — حساب افتراضي", preview: "[محاكاة] شكرًا لتواصلك، هذه مسودة غير حقيقية ولا تُرسل إلى أي شخص.",
+      risk: "medium", createdAt: ago(5), expiresAt: ahead(55), status: "pending", executable: false,
+    },
+    {
+      id: "r2", kind: "publish_comment", action: "مراجعة تعليق تجريبي",
+      target: "فيسبوك — صفحة افتراضية", preview: "[محاكاة] يسعدنا استقبال استفسارك. هذا التعليق نص مثال فقط، ولا يوجد اتصال بفيسبوك.",
+      risk: "high", createdAt: ago(20), expiresAt: ahead(40), status: "pending", executable: false,
+    },
+    {
+      id: "r3", kind: "project_change", action: "مثال على مسودة معتمدة",
+      target: "مشروع تجريبي", preview: "[محاكاة] سجل قرار عرض فقط؛ لم يحدث تغيير في أي مشروع.",
+      risk: "high", createdAt: ago(120), decidedAt: ago(115), status: "approved", executable: false,
+    },
+    {
+      id: "r4", kind: "other", action: "مثال على مسودة مرفوضة",
+      target: "سيناريو وهمي", preview: "[محاكاة] مثال على حالة مرفوضة بلا أي أثر خارجي.",
+      risk: "low", createdAt: ago(200), decidedAt: ago(190), status: "rejected", executable: false,
+    },
+    {
+      id: "r5", kind: "external_message", action: "مثال على مسودة منتهية",
+      target: "جهة افتراضية", preview: "[محاكاة] انتهى وقت مراجعة هذا المثال ولا يمكن اعتماده.",
+      risk: "medium", createdAt: ago(260), expiresAt: ago(200), status: "expired", executable: false,
+    },
   ],
   logs: (): ActivityLog[] => [
     { id: "l1", at: ago(1), level: "info", actor: "system", message: "تم تحميل الواجهة في الوضع التجريبي" },
