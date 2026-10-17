@@ -66,6 +66,29 @@ async function run(label, width, height) {
     await page.getByText("تفويض الخادم المحلي").first().waitFor({ timeout: 15_000 });
     assert.ok(await page.getByLabel("رمز الاتصال المحلي").isDisabled(),
       label + ": preview token input must be disabled");
+    // Read-only reports should provide safe task inspection and log filters.
+    if (width < 768) {
+      await page.getByRole("button", { name: "فتح القائمة الرئيسية" }).click();
+      await page.getByRole("dialog").getByRole("link", { name: "التقارير والسجلات" }).click();
+    } else {
+      await page.getByRole("navigation", { name: "التنقل الرئيسي" })
+        .getByRole("link", { name: "التقارير والسجلات" }).first().click();
+    }
+    await page.getByText("مركز المهام والتقارير", { exact: true }).first().waitFor({ timeout: 15_000 });
+    await page.getByTestId("task-monitor").waitFor({ timeout: 15_000 });
+    await page.getByRole("button", { name: "مكتملة (1)" }).click();
+    await page.getByText("أرشفة المحادثات القديمة", { exact: true }).first().waitFor({ timeout: 10_000 });
+    await page.getByTestId("task-detail-k3").locator("summary").click();
+    await page.getByText("فتح التفاصيل لا يغيّر حالة المهمة", { exact: false }).first().waitFor({ timeout: 10_000 });
+    await page.getByLabel("البحث في المهام").fill("عنصر غير موجود 8675309");
+    await page.getByText("لا توجد مهام تطابق البحث", { exact: false }).waitFor({ timeout: 10_000 });
+    await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).first().click();
+    await page.getByText("تلخيص الرسائل غير المقروءة", { exact: true }).first().waitFor({ timeout: 10_000 });
+    await page.getByLabel("البحث في السجل").fill("عبارة لا تظهر في أي سجل 8675309");
+    await page.getByText("لا توجد أحداث تطابق", { exact: false }).waitFor({ timeout: 10_000 });
+    await page.getByRole("button", { name: "إعادة ضبط الفلاتر" }).last().click();
+    await page.getByText("تم تحميل الواجهة في الوضع التجريبي", { exact: false }).waitFor({ timeout: 10_000 });
+
     const overflow = await page.evaluate(() => ({
       doc: document.documentElement.scrollWidth,
       width: window.innerWidth,
