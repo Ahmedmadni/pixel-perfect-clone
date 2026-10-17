@@ -175,7 +175,7 @@ async function operation(data, actor, action) {
         if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
           validateScopedAgentUrl(request.url(), agentScope.origin);
         }
-        await route.continue();
+        await route.fallback();
       } catch {
         await route.abort("blockedbyclient").catch(() => {});
       }
