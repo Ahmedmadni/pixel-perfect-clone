@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Clock3, Search, ShieldCheck, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, MOCK_MODE } from "@/lib/api/client";
@@ -11,6 +12,7 @@ import {
   type ApprovalFilter, type ApprovalRiskFilter,
 } from "@/lib/approval-view";
 import { pageHead } from "@/lib/seo";
+import { approvalsSearch } from "@/lib/workspace-links";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -22,6 +24,7 @@ import { PageHeader, Panel, Pill, QueryState, fmtTime, type Tone } from "@/compo
 
 export const Route = createFileRoute("/approvals")({
   head: pageHead("مركز الموافقات", "Read-only review of immutable drafts. Decisions never dispatch external actions."),
+  validateSearch: approvalsSearch,
   component: ApprovalsPage,
 });
 
@@ -39,11 +42,13 @@ const empty: ApprovalDraft = {kind:"external_message",action:"",target:"",previe
 type Decision = "approve" | "reject";
 
 function ApprovalsPage() {
+  const {status:linkedStatus} = Route.useSearch();
   const qc = useQueryClient();
   const query = useQuery({queryKey:["approvals"], queryFn:api.approvals, retry:0, refetchInterval:10000});
   const [draft,setDraft] = useState<ApprovalDraft>({...empty});
   const [displayForm,setDisplayForm] = useState(false);
-  const [stateFilter,setStateFilter] = useState<ApprovalFilter>("all");
+  const [stateFilter,setStateFilter] = useState<ApprovalFilter>(linkedStatus ?? "all");
+  useEffect(() => { setStateFilter(linkedStatus ?? "all"); }, [linkedStatus]);
   const [riskFilter,setRiskFilter] = useState<ApprovalRiskFilter>("all");
   const [search,setSearch] = useState("");
   const [review,setReview] = useState<{record:ApprovalRequest;decision:Decision}|null>(null);
@@ -134,6 +139,15 @@ function ApprovalsPage() {
           {displayForm?"إغلاق النموذج":"إنشاء مسودة مراجعة"}
         </Button>} />
 
+      {linkedStatus === "pending" && (
+        <div className="mb-4 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs" role="status">
+          وصلت إلى جميع المسودات المعلقة من مركز المهام أو رابط مباشر.
+          هذه القائمة لا تثبت أن أي مسودة مرتبطة بمهمة محددة.
+          <Link to="/reports" search={{}} className="ms-2 text-primary underline">
+            العودة إلى التقارير
+          </Link>
+        </div>
+      )}
       {MOCK_MODE && (
         <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning" role="note">
           <strong>مختبر موافقات تجريبي:</strong> يمكنك فتح مسودة، مراجعة نصها، ومحاكاة الاعتماد أو الرفض.
