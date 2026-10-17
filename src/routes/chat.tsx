@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Send, Square } from "lucide-react";
 import { api, MOCK_MODE, type ChatStreamEvent } from "@/lib/api/client";
+import { demoChatReply } from "@/lib/demo-chat";
 import type { ChatMessage, TaskStatus } from "@/lib/api/types";
 import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,20 @@ function ChatPage() {
   }
 
   async function submit(content: string) {
-    if (busy || !content.trim() || !selected || MOCK_MODE) return;
+    if (busy || !content.trim()) return;
+    if (MOCK_MODE) {
+      const at = new Date().toISOString();
+      const id = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9);
+      const input = content.trim();
+      setMessages((current) => [
+        ...current,
+        { id: "demo-user-" + id, role: "user", content: input, at, status: "complete" },
+        { id: "demo-assistant-" + id, role: "assistant", content: demoChatReply(input), at, status: "complete" },
+      ]);
+      setText("");
+      return;
+    }
+    if (!selected) return;
     const ctl = new AbortController();
     abortRef.current = ctl;
     setError(null);
@@ -91,7 +105,13 @@ function ChatPage() {
 
   return (
     <>
-      <PageHeader title="المحادثة والمهام" desc="محادثة محلية حقيقية باستخدام Ollama، بدون اشتراك في API مدفوع." />
+      <PageHeader title="المحادثة والمهام" desc={MOCK_MODE ? "جرّب واجهة المحادثة برسائل افتراضية، دون استدعاء أي نموذج أو خدمة." : "محادثة محلية حقيقية باستخدام Ollama، بدون اشتراك في API مدفوع."} />
+      {MOCK_MODE && (
+        <div role="note" className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+          <strong>مختبر عرض تجريبي:</strong> اكتب رسالة لتجربة شكل المحادثة. الردود نماذج ثابتة محلية داخل الواجهة،
+          ولا تُرسل إلى Ollama أو حساباتك. لا تُدخل معلومات شخصية أو كلمات مرور.
+        </div>
+      )}
       <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
         <Panel className="flex flex-col">
           <div className="mb-3 flex flex-wrap items-center gap-3 border-b pb-3">
@@ -110,6 +130,11 @@ function ChatPage() {
             <Pill tone={MOCK_MODE ? "warning" : models.error ? "danger" : selected ? "success" : "neutral"}>
               {MOCK_MODE ? "تجريبي" : models.error ? "Ollama غير متصل" : selected ? "نموذج متاح" : "لا توجد نماذج"}
             </Pill>
+            {MOCK_MODE && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setMessages(history.data ?? [])}>
+                إعادة ضبط التجربة
+              </Button>
+            )}
           </div>
           {!MOCK_MODE && models.error && (
             <p className="mb-3 text-sm text-destructive">فشل اكتشاف Ollama: {models.error.message}. شغّل Ollama على الكمبيوتر وتأكد من رمز الخادم المحلي.</p>
@@ -132,15 +157,15 @@ function ChatPage() {
             className="mt-4 flex gap-2 border-t pt-4"
             onSubmit={(e) => { e.preventDefault(); void submit(text); }}
           >
-            <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="اكتب رسالتك…" rows={2} className="resize-none" disabled={busy || MOCK_MODE} />
+            <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={MOCK_MODE ? "جرّب: لخص رسائل واتساب (محاكاة فقط)…" : "اكتب رسالتك…"} rows={2} className="resize-none" disabled={busy} />
             {busy ? (
               <Button type="button" variant="destructive" onClick={() => abortRef.current?.abort()} title="إيقاف التوليد"><Square className="size-4" /></Button>
             ) : (
-              <Button type="submit" disabled={!text.trim() || !selected || MOCK_MODE || !!models.error} title="إرسال"><Send className="size-4" /></Button>
+              <Button type="submit" disabled={!text.trim() || (!MOCK_MODE && (!selected || !!models.error))} title={MOCK_MODE ? "تجربة محاكاة" : "إرسال"} aria-label={MOCK_MODE ? "تجربة محاكاة" : "إرسال"}><Send className="size-4" /></Button>
             )}
           </form>
           {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
-          {MOCK_MODE && <p className="mt-2 text-xs text-warning">الوضع التجريبي — لا يتم إرسال الرسائل إلى أي نموذج حقيقي.</p>}
+          {MOCK_MODE && <p className="mt-2 text-xs text-warning">كل الردود معلمة بأنها محاكاة. لا تُحفظ هذه الرسائل في قاعدة بيانات أو خدمة خارجية.</p>}
         </Panel>
         <Panel title="المهام">
           <QueryState q={tasks}>
