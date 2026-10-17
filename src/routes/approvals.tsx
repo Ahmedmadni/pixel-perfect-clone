@@ -319,7 +319,7 @@ function ApprovalsPage() {
               <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm">
                 <Checkbox aria-label="أؤكد مراجعة نص المسودة" checked={checked}
                   onCheckedChange={(value)=>setChecked(value===true)} />
-                <span>قرأت نص المسودة كاملًا وأفهم أن هذا القرار **لا يرسل رسالة ولا ينشر تعليقًا ولا يغيّر الحسابات**.</span>
+                <span>قرأت نص المسودة كاملًا، وأفهم أن القرار لا يرسل رسائل ولا ينشر تعليقات ولا يعدّل أي حساب.</span>
               </label>
               <DialogFooter>
                 <Button variant="outline" disabled={decide.isPending} onClick={()=>{setReview(null);setChecked(false);}}>
