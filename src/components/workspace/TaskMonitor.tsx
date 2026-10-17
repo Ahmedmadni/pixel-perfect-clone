@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Activity, CheckCircle2, Clock3, ListChecks, Search, ShieldAlert } from "lucide-react";
 import type { AgentTask, TaskStatus } from "@/lib/api/types";
 import { filterTasks, summarizeTasks, TASK_LABELS, TASK_STATES, type TaskFilter } from "@/lib/activity-view";
@@ -26,11 +27,12 @@ function SummaryItem({ label, count, icon: Icon }: {
 }
 
 /** Read-only task inspector. Filtering and expanding rows are entirely local UI state. */
-export function TaskMonitor({ tasks, preview }: { tasks: AgentTask[]; preview: boolean }) {
+export function TaskMonitor({ tasks, preview, focusedTaskId }: { tasks: AgentTask[]; preview: boolean; focusedTaskId?: string }) {
   const [status, setStatus] = useState<TaskFilter>("all");
   const [search, setSearch] = useState("");
   const counts = summarizeTasks(tasks);
   const visible = filterTasks(tasks, status, search);
+  const focusedTask = focusedTaskId ? tasks.find((item) => item.id === focusedTaskId) : undefined;
 
   return (
     <div className="space-y-4" data-testid="task-monitor">
@@ -68,11 +70,23 @@ export function TaskMonitor({ tasks, preview }: { tasks: AgentTask[]; preview: b
             </Button>
           ))}
         </div>
+        {focusedTaskId && (
+          <div role="status" className="mb-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs">
+            {focusedTask ? (
+              <>تم تحديد المهمة المرتبطة بالتنبيه: <strong>{focusedTask.title}</strong>.
+                يمكنك مراجعة خطواتها أدناه دون تغيير حالتها.</>
+            ) : (
+              <>لم تظهر المهمة المطلوبة ضمن أحدث السجلات المتاحة؛ قد تكون أقدم من حد العرض الحالي.
+                لن نعرض مهمة أخرى بدلًا منها.</>
+            )}
+          </div>
+        )}
         {visible.length ? (
           <ul className="divide-y">
             {visible.map((t) => (
-              <li key={t.id} className="py-3">
-                <details className="group" data-testid={"task-detail-" + t.id}>
+              <li key={t.id} className={t.id === focusedTaskId ? "rounded-md border border-primary/40 bg-primary/5 px-2 py-3" : "py-3"}>
+                <details key={t.id === focusedTaskId ? "focused" : "ordinary"} defaultOpen={t.id === focusedTaskId}
+                  className="group" data-testid={"task-detail-" + t.id}>
                   <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 rounded-md px-1 py-2 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0 flex-1">
                       <span className="block break-words font-medium">{t.title}</span>
@@ -84,6 +98,14 @@ export function TaskMonitor({ tasks, preview }: { tasks: AgentTask[]; preview: b
                   </summary>
                   <div className="ms-1 mt-2 space-y-2 rounded-md border bg-muted/20 p-3 text-sm">
                     {t.objective && <p className="break-words"><strong>الهدف:</strong> {t.objective}</p>}
+                    {t.status === "awaiting_approval" && (
+                      <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+                        <p>هذه المهمة معروضة كمنتظرة للموافقة. النظام لا يسجل حاليًا معرّف مسودة مرتبطة بها.</p>
+                        <Link to="/approvals" search={{status:"pending"}} className="mt-2 inline-block text-primary underline">
+                          عرض جميع المسودات المعلقة (وليست بالضرورة مرتبطة بهذه المهمة)
+                        </Link>
+                      </div>
+                    )}
                     {t.model && <p className="break-all"><strong>النموذج:</strong> <span dir="ltr">{t.model}</span></p>}
                     {t.finishedAt && <p><strong>الانتهاء:</strong> {fmtTime(t.finishedAt)}</p>}
                     {t.result && <div><strong>النتيجة:</strong><p className="mt-1 whitespace-pre-wrap break-words">{t.result}</p></div>}
