@@ -144,7 +144,11 @@ export class ReadOnlyAgent {
       }
       const plan=parseBrowserPlan(raw);
       if(plan.action==="finish"){
-        return (completed.length?"الخطوات المنفذة:\n"+completed.join("\n")+"\n\n":"")+plan.message;
+        if(completed.length===0) {
+          throw new Error("لم تُنفذ أي خطوة على التاب؛ ربما تحتاج العملية لتدخل يدوي: "+plan.message.slice(0,100));
+        }
+        return "ما تم تنفيذه بالفعل على التاب:\n"+completed.join("\n")+
+          "\n\nملاحظة النموذج (ليست دليلًا على تنفيذ إضافي): "+plan.message;
       }
       if(signal.aborted)throw new Error("Cancelled");
       const done=await this.browser.agentAction(task.tabId,plan);
