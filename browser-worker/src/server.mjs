@@ -3,7 +3,7 @@ import { connect } from "node:net";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { chromium } from "playwright";
-import { canOperate, validHandoff, validateBrowserUrl, agentOrigin, validateScopedAgentUrl } from "./policy.mjs";
+import { canOperate, validHandoff, validateBrowserUrl, agentOrigin, validateScopedAgentUrl, safeNavigationLink } from "./policy.mjs";
 import { inspectPage, runSafeAgentAction } from "./agent-operations.mjs";
 
 const token = process.env.BROWSER_WORKER_TOKEN ?? "";
@@ -166,7 +166,7 @@ async function operation(data, actor, action) {
     return { closed: true };
   }
   if (action === "navigate") {
-    const url = actor === "agent" ? validateScopedAgentUrl(data.url, agentScope.origin) : validateBrowserUrl(data.url);
+    const url = actor === "agent" ? safeNavigationLink(data.url, "", agentScope.origin) : validateBrowserUrl(data.url);
     // Redirects are checked too. Main-frame navigation may not escape approved
     // HTTPS domains; third-party subresources are not treated as new top-level sites.
     const guard = async (route) => {
