@@ -8,7 +8,7 @@ const plan=z.discriminatedUnion("action",[
   z.object({action:z.literal("scroll"),direction:z.enum(["up","down"])}).strict(),
   z.object({action:z.literal("follow_link"),elementId:id}).strict(),
   z.object({action:z.literal("fill"),elementId:id,text}).strict(),
-  z.object({action:z.literal("navigate"),url:z.string().url().max(2048)}).strict(),
+  z.object({action:z.literal("navigate"),url:z.string().url().max(2048).refine((raw)=>{ try { const u=new URL(raw); return u.protocol==="https:" && !u.username && !u.password; } catch {return false;} })}).strict(),
 ]);
 export type BrowserPlan=z.infer<typeof plan>;
 
