@@ -7,6 +7,7 @@ import type { BrowserTabAction } from "@/lib/api/types";
 import { useControl } from "@/lib/control-context";
 import { canSend } from "@/lib/control-machine";
 import { pageHead } from "@/lib/seo";
+import { normalizeBrowserAddress } from "@/lib/browser-url";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,7 +63,9 @@ function BrowserPage() {
   });
   function browse(e:React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if(manual&&currentTab&&url.trim())tabsMutation.mutate({action:"navigate",tabId:currentTab.id,url:url.trim()});
+    if(!manual||!currentTab||!url.trim())return;
+    try{tabsMutation.mutate({action:"navigate",tabId:currentTab.id,url:normalizeBrowserAddress(url)});}
+    catch(e){setError(e instanceof Error?e.message:"عنوان الموقع غير صالح");}
   }
 
   return <>
@@ -91,7 +94,7 @@ function BrowserPage() {
         </div>
         <form className="flex min-w-0 items-center gap-2 border-b p-2" onSubmit={browse}>
           <Globe className="hidden size-4 shrink-0 text-muted-foreground sm:block"/>
-          <Input aria-label="عنوان الموقع" dir="ltr" type="url" placeholder="https://example.com" value={url}
+          <Input aria-label="عنوان الموقع" dir="ltr" type="text" placeholder="example.com أو https://example.com" value={url}
             onChange={e=>setUrl(e.target.value)} disabled={!manual||tabsMutation.isPending}/>
           <Button size="sm" disabled={!manual||!currentTab||!url.trim()||tabsMutation.isPending}>فتح</Button>
         </form>
