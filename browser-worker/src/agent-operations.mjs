@@ -50,7 +50,7 @@ export async function runSafeAgentAction(page,data,origin) {
         const request=route.request();
         if(request.isNavigationRequest()&&request.frame()===page.mainFrame())
           validateScopedAgentUrl(request.url(),origin);
-        await route.continue();
+        await route.fallback();
       }catch{await route.abort("blockedbyclient").catch(()=>{});}
     };
     await page.route("**/*",guard);
