@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api, MOCK_MODE } from "@/lib/api/client";
+import { filterTasks, TASK_LABELS } from "@/lib/activity-view";
 import { useControl } from "@/lib/control-context";
 import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,23 @@ function Overview() {
             )}
           </QueryState>
           <p className="mt-3 text-xs text-muted-foreground">لن يتم وصف أي خدمة بأنها تعمل حتى تنجح اختبارات التكامل المحلية.</p>
+        </Panel>
+        <Panel title="متابعة المهام" actions={<Button asChild size="sm" variant="ghost"><Link to="/reports">مركز المهام</Link></Button>}>
+          <QueryState q={tasks} empty="لا توجد مهام حتى الآن.">
+            {(items) => (
+              <ul className="divide-y">
+                {filterTasks(items, "all", "").slice(0, 4).map((task) => (
+                  <li key={task.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                    <span className="min-w-0 flex-1 break-words text-sm">{task.title}</span>
+                    <Pill tone={task.status === "done" ? "success" : task.status === "failed" ? "danger" : task.status === "awaiting_approval" ? "warning" : "neutral"}>
+                      {TASK_LABELS[task.status]}
+                    </Pill>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </QueryState>
+          <p className="mt-3 text-xs text-muted-foreground">{MOCK_MODE ? "أمثلة للمعاينة فقط — ليست مهامًا حقيقية." : "استعرض كل المهام وخطواتها في مركز المتابعة."}</p>
         </Panel>
         <Panel title="آخر النشاطات" actions={<Button asChild size="sm" variant="ghost"><Link to="/reports">الكل</Link></Button>}>
           <QueryState q={logs}>
