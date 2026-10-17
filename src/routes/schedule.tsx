@@ -14,8 +14,8 @@ function SchedulePage() {
   const q = useQuery({ queryKey: ["schedules"], queryFn: api.schedules });
   return (
     <>
-      <PageHeader title="المهام المجدولة" desc={MOCK_MODE ? "عرض تصميم الجدولة ببيانات تجريبية فقط؛ لا تعمل أي مهمة تلقائيًا." : "عرض المهام المجدولة من الخادم المحلي؛ تفعيل الجدولة غير متاح من هذه الشاشة."} />
-      {MOCK_MODE && <p role="status" className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">جميع المهام والتواريخ الظاهرة أمثلة للمعاينة فقط، حتى لو ظهرت علامة التفعيل.</p>}
+      <PageHeader title="المهام المجدولة" desc={MOCK_MODE ? "لا توجد جدولة متصلة في معاينة Lovable؛ لا يتم تنفيذ أي مهمة." : "عرض المهام المجدولة من الخادم المحلي؛ تفعيل الجدولة غير متاح من هذه الشاشة."} />
+      {MOCK_MODE && <p role="status" className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">لا توجد مهام مجدولة فعلية متصلة. هذه الصفحة لا تنشئ مهامًا وهمية.</p>}
       <div className="grid gap-3 md:grid-cols-2">
         <QueryState q={q}>
           {(ss) => ss.map((s) => (
