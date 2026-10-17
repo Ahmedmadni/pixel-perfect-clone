@@ -52,8 +52,8 @@ export async function buildApp(
     controlQueue = next.catch(() => {});
     return next;
   }
-  const agent = dependencies?.browser && dependencies.ollama && dependencies.tasks && dependencies.permissions
-    ? new ReadOnlyAgent(store, dependencies.browser, dependencies.ollama, dependencies.tasks, dependencies.permissions, serializeControl)
+  const agent = dependencies?.browser && dependencies.ollama && dependencies.tasks
+    ? new ReadOnlyAgent(store, dependencies.browser, dependencies.ollama, dependencies.tasks, serializeControl)
     : null;
   const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
 
