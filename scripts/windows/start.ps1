@@ -73,9 +73,38 @@ try {
   Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoProfile","-NoExit","-Command",$runtimeCommand) | Out-Null
   Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoProfile","-NoExit","-Command",$frontendCommand) | Out-Null
 
-  Write-Host "Opening trusted LOCAL dashboard; never paste secrets into the Lovable hosted preview." -ForegroundColor Green
+  # Process creation is not proof of readiness: never open a misleading blank browser.
+  $apiReady = $false
+  $uiReady = $false
+  for ($i=0; $i -lt 30; $i++) {
+    if (-not $apiReady) {
+      try {
+        $state = Invoke-RestMethod -Uri "http://127.0.0.1:4100/v1/health" -TimeoutSec 3
+        $db = @($state.services | Where-Object { $_.name -eq "postgres" -and $_.status -eq "up" })
+        $apiReady = ($db.Count -gt 0)
+      } catch {}
+    }
+    if (-not $uiReady) {
+      try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:8080/" -UseBasicParsing -TimeoutSec 3
+        $uiReady = ($response.StatusCode -eq 200)
+      } catch {}
+    }
+    if ($apiReady -and $uiReady) { break }
+    Start-Sleep -Seconds 2
+  }
+  if (-not ($apiReady -and $uiReady)) {
+    Write-Warning "One or more local processes did not become ready. Browser will not open automatically."
+    Write-Host ("Fastify/PostgreSQL: " + $(if($apiReady){"ready"}else{"NOT READY"}))
+    Write-Host ("Local dashboard: " + $(if($uiReady){"ready"}else{"NOT READY"}))
+    Write-Host "Check the two opened PowerShell consoles, then run:"
+    Write-Host "  .\\scripts\\windows\\diagnose.ps1"
+    throw "Windows local startup did not pass readiness verification."
+  }
+  Write-Host "Trusted LOCAL dashboard ready; never paste secrets into hosted Lovable." -ForegroundColor Green
   Write-Host "Local UI: http://127.0.0.1:8080"
-  Write-Host "Use RUNTIME_TOKEN from runtime\.env in Settings. noVNC has a separate password in browser-worker\.env."
+  Write-Host "Ollama model status is separate: check Settings or run diagnose.ps1 -TestInference."
+  Write-Host "Use RUNTIME_TOKEN from runtime\\.env in Settings. noVNC has a separate password in browser-worker\\.env."
   Start-Process "http://127.0.0.1:8080" | Out-Null
 } finally {
   Pop-Location
