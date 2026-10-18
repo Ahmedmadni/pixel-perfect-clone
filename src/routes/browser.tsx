@@ -169,6 +169,7 @@ function BrowserPage() {
           {connected&&canSend(state,"RESET")&&<Button className="w-full" variant="outline" disabled={pending} onClick={()=>void send({type:"RESET"})}><RefreshCw className="size-4"/> تفعيل المتصفح اليدوي</Button>}
           {connected&&canSend(state,"TAKE_OVER")&&<Button className="w-full" variant="outline" disabled={pending} onClick={()=>void send({type:"TAKE_OVER"})}><Hand className="size-4"/> استرجاع التحكم</Button>}
           {!MOCK_MODE&&!aiReady&&<p className="text-xs text-muted-foreground">المساعد يحتاج تشغيل Ollama وعامل Chromium المحلي. اختيار التاب والضغط على بدء المهمة هو التفويض المحدد لهذا الموقع؛ لا توجد حاجة لقائمة طويلة من المواقع.</p>}
+          {!MOCK_MODE&&(!aiReady||!connected)&&<Link to="/settings" className="inline-block text-sm font-medium text-primary underline underline-offset-4">شخّص سبب عدم الجاهزية وأصلح الاتصال من الإعدادات</Link>}
           {MOCK_MODE&&<p className="text-xs text-muted-foreground">لا توجد جلسة متصفح أو مهمة فعلية في Lovable.</p>}
         </section>
       </aside>
