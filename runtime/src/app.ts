@@ -99,10 +99,12 @@ export async function buildApp(
       pg = { name: "postgres", status: "down", detail: (e as Error).message.slice(0, 200) };
     }
     const notProbed = "not probed: integration not yet implemented";
+    let installedModelCount = 0;
     let ollamaHealth: HealthResponse["services"][number] = { name: "ollama", status: "unknown", detail: notProbed };
     if (dependencies?.ollama) {
       try {
         const models = await dependencies.ollama.listModels();
+        installedModelCount = models.length;
         ollamaHealth = { name: "ollama", status: "up", detail: `${models.length} model(s) installed` };
       } catch {
         ollamaHealth = { name: "ollama", status: "down", detail: "local Ollama not reachable" };
@@ -115,14 +117,15 @@ export async function buildApp(
     }
     return {
       version: VERSION,
-      degraded: pg.status !== "up" || ollamaHealth.status === "down" || (dependencies?.browser && !browserHealth?.ready) === true,
+      degraded: pg.status !== "up" || ollamaHealth.status === "down" ||
+        (Boolean(dependencies?.browser) && (!browserHealth?.ready || !browserHealth.novnc)),
       services: [
         { name: "api", status: "up" },
         pg,
         ollamaHealth,
         dependencies?.browser ? { name: "playwright", status: browserHealth?.ready ? "up" : "down" } : { name: "playwright", status: "unknown", detail: notProbed },
         dependencies?.browser ? { name: "novnc", status: browserHealth?.novnc ? "up" : "down" } : { name: "novnc", status: "unknown", detail: notProbed },
-        { name: "agent", status: agent ? ((browserHealth?.ready && browserHealth.agentRunnerReady && ollamaHealth.status === "up") ? "up" : "down") : "unknown", detail: agent ? "User-started read-only review runner; no posting or messaging" : "Read-only runner not configured" },
+        { name: "agent", status: agent ? ((browserHealth?.ready && browserHealth.novnc && browserHealth.agentRunnerReady && installedModelCount > 0 && pg.status === "up") ? "up" : "down") : "unknown", detail: agent ? (installedModelCount === 0 ? "Install at least one local Ollama model before starting a task" : "User-started same-tab review runner; no posting or messaging") : "Read-only runner not configured" },
       ],
     };
   });
