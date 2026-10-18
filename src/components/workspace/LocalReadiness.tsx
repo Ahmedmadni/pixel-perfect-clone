@@ -42,9 +42,9 @@ export function LocalReadiness() {
     mock:MOCK_MODE,
     localOrigin:local,
     tokenPresent:hasToken,
-    health:health.data,
+    health:health.data ?? null,
     healthError:Boolean(health.error),
-    auth,installedModels:models.data?.models.length,
+    auth,installedModels:models.data?.models.length ?? null,
   }),[local,hasToken,health.data,health.error,auth,models.data]);
   const loading=canProbe&&(health.isPending || (hasToken&&status.isPending));
   function refresh(){
