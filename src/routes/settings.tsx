@@ -7,6 +7,7 @@ import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, Panel, Pill } from "@/components/workspace/ui-bits";
+import { LocalReadiness } from "@/components/workspace/LocalReadiness";
 
 export const Route = createFileRoute("/settings")({
   head: pageHead("إعدادات النظام", "Local runtime endpoints, security posture and language."),
@@ -54,6 +55,7 @@ function SettingsPage() {
           <Row k="VITE_LOCAL_API_URL" v={<code dir="ltr" className="max-w-full break-all font-mono text-xs">{API_BASE}</code>} />
           <Row k="VITE_NOVNC_URL" v={<code dir="ltr" className="max-w-full break-all font-mono text-xs">{NOVNC_URL}</code>} />
         </Panel>
+        <LocalReadiness />
         <Panel title="الأمان">
           <Row k="الاستماع على" v={<code className="font-mono text-xs">127.0.0.1 فقط</code>} />
           <Row k="المصادقة" v={<Pill tone={tokenExists ? "success" : "warning"}>{tokenExists ? "رمز محفوظ للجلسة الحالية" : "لم يُدخل رمز الاتصال"}</Pill>} />
