@@ -27,6 +27,9 @@ This runs **once**. It checks for required programs, creates private local files
 generates three independent secrets (PostgreSQL password, API token, browser-worker
 token) and a separate VNC password, and installs frontend/backend dependencies.
 The setup refuses to overwrite any existing local config, avoiding lost sessions.
+AI browser control is **OFF by default** (`BROWSER_ENABLE_READONLY_AGENT=false`);
+manual browsing stays available. Enable AI later only after local sandbox testing
+and explicit permission review.
 
 Generated files (ignored by Git):
 - `local/.env` — local DB password.
@@ -42,8 +45,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\start.ps1
 
 The launcher starts local PostgreSQL and Chromium/noVNC containers, checks their
 readiness **with Chromium sandbox enabled**, applies the 7 SQL migrations and
-opens separate PowerShell windows for the API and web UI. It opens
-`http://127.0.0.1:8080` when the processes have been launched.
+opens separate PowerShell windows for the API and web UI. It waits for the local Fastify/PostgreSQL and frontend health checks, and opens
+`http://127.0.0.1:8080` **only after both are responding**. If either fails,
+run `scripts/windows/diagnose.ps1` without sharing credentials.
 
 Find `RUNTIME_TOKEN` inside `runtime/.env` **on your PC** and paste it in
 **الإعدادات → رمز الخادم المحلي**. Do NOT paste that token in this chat, GitHub,
