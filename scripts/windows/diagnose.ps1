@@ -4,12 +4,14 @@
   database, permissions, sessions or user profiles. Never prints secrets.
 #>
 [CmdletBinding()]
-param([switch]$TestInference)
+param([switch]$TestInference, [switch]$Strict)
 $ErrorActionPreference = "Stop"
+$script:checksFailed = 0
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $runtimeConfig = Join-Path $root "runtime\.env"
 $browserConfig = Join-Path $root "browser-worker\.env"
 function Check([string]$name, [bool]$ok, [string]$detail) {
+  if (-not $ok) { $script:checksFailed += 1 }
   $state = if ($ok) { "OK" } else { "NOT READY" }
   Write-Host ("[{0}] {1}: {2}" -f $state,$name,$detail)
 }
@@ -93,3 +95,9 @@ try {
   Check "Real Ollama" $false "not running; install Ollama and pull a supported model"
 }
 Write-Host "No account content, session cookies, access tokens, or private backup data were printed."
+Write-Host ("Diagnostics finished: " + $script:checksFailed + " check(s) not ready.")
+if ($Strict -and $script:checksFailed -gt 0) {
+  Write-Error "Local workspace is not fully ready. Inspect statuses above; no secrets were printed."
+  exit 1
+}
+
