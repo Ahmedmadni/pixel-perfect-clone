@@ -43,7 +43,7 @@ if(-not $before.ready -or $before.mode -ne "STOPPED") {
 }
 Push-Location $root
 try {
-  & docker compose -f "compose.browser.yml" stop browser-worker
+  & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
   if($LASTEXITCODE -ne 0) { throw "Browser stop failed; startup was not attempted." }
   & docker compose -f "compose.browser.yml" up -d --no-deps browser-worker
   if($LASTEXITCODE -ne 0) { throw "Browser restart failed; inspect local container logs." }
