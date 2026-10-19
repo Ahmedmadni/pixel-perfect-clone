@@ -27,6 +27,8 @@ test("Windows production startup cannot enable CI browser bypass", () => {
   const preflight = read("scripts/windows/preflight.ps1");
   const compose = read("compose.browser.yml");
   assert.match(start, /preflight\.ps1/);
+  assert.match(start, /docker info --format "\{\{\.OSType\}\}"/);
+  assert.match(start, /\$dockerOs -ne "linux"/);
   assert.match(preflight, /BROWSER_CI_TRUSTED_SMOKE/);
   for (const [name, source] of [["start",start],["launch",launch],["compose",compose]]) {
     assert.doesNotMatch(source, /--no-sandbox|--disable-setuid-sandbox|BROWSER_CI_TRUSTED_SMOKE\s*[=:]\s*true/i, name);
