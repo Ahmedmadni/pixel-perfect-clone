@@ -115,7 +115,7 @@ jobs:
         run: |
           curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-profile-before.json
           node -e 'const h = require("/tmp/paw-profile-before.json"); if (h.ciProfileRecovered !== false) process.exit(1)'
-          docker compose -f compose.browser.yml restart browser-worker
+          docker compose -f compose.browser.yml restart -t 30 browser-worker
           ready=0
           for i in $(seq 1 40); do
             if curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-profile-after.json; then
@@ -135,7 +135,7 @@ jobs:
           fi
       - name: Verify worker outage fails closed and recovery remains STOPPED
         run: |
-          docker compose -f compose.browser.yml stop browser-worker
+          docker compose -f compose.browser.yml stop -t 30 browser-worker
           if curl --fail --silent --show-error --max-time 3 -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-should-be-offline.json 2>/dev/null; then
             echo "Worker endpoint remained reachable after container stop" >&2
             exit 1
