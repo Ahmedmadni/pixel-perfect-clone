@@ -217,6 +217,16 @@ From the repository root, stop only the project's browser and database container
 
 The script deliberately does **not** terminate the separate Fastify/UI PowerShell windows. Close those windows manually. It never invokes `docker compose down -v` or deletes browser sessions, database volumes, local settings or backups. Restart normally with `.\scripts\windows\launch.ps1`. It does not validate a successful shutdown on the owner's computer until run there.
 
+### Restart only Chromium without deleting sessions
+
+When no agent task is running, you can restart only the browser container:
+
+```powershell
+.\scripts\windows\restart-browser.ps1
+```
+
+This stops and starts `browser-worker` using the existing profile volume. It verifies Linux containers and rejects temporary CI mode. Success requires the browser worker to report that Chromium and noVNC are ready with ownership mode `STOPPED`; it never resumes autonomous agent tasks. It does not restart PostgreSQL or the separately running API/UI consoles. If readiness fails, do not bypass the sandbox or use real accounts. **This workflow still requires a real Windows acceptance test.**
+
 ## Verification limits
 
 GitHub Actions checks the frontend, runtime, SQL migrations, domain policies and
