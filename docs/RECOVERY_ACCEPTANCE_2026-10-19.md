@@ -35,3 +35,9 @@ Record individual PASS/FAIL/BLOCKED results in [Windows acceptance protocol](WIN
 - No verified user-machine backups/profile restoration.
 - No licensed/approved external posting or messaging adapter; approval queue is **not** an execution adapter.
 - An untested or failed recovery check means **no production approval**, regardless of earlier passing workflow runs.
+
+## Additional review — Chromium persistence regression
+
+A later Browser Worker Smoke Test at commit `553b16f9dd026998761cf3af4e3f6a36dfcb8163` (run `39247827287`) **failed** specifically at the synthetic cookie persistence assertion after a container restart, despite the earlier run `39247761231` passing. This is an intermittent or environment-sensitive problem until root cause is established; do not mark persistence fully accepted. Follow-up commit `ea41be5c1434fd2539c208d40f859aabb5238aef` adds safe health-field diagnostics to failed CI runs without logging secrets or cookies. Its run must be reviewed separately. The recovery test remains strict; it does not turn an absent cookie into success.
+
+**Release blocker:** prove consistent persistence in repeated isolated browser runs and then on the owner's sandbox-enabled Windows host before using real accounts.
