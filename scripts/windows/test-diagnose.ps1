@@ -14,19 +14,30 @@ try {
   [IO.File]::WriteAllText((Join-Path $root "browser-worker\.env"), "BROWSER_WORKER_TOKEN=")
   [IO.File]::WriteAllText((Join-Path $root "local\.env"), "POSTGRES_PASSWORD=test-only")
   [IO.File]::WriteAllText((Join-Path $root ".env.local"), "VITE_MOCK_MODE=false")
-  # Run a separate PowerShell process: a strict diagnostic must exit with failure,
-  # not accidentally terminate the parent test process.
+  # Run separate processes so intentional strict failures cannot terminate this test.
   $shell = (Get-Process -Id $PID).Path
-  $output = & $shell -NoProfile -File $script -Root $root -Strict 2>&1 | Out-String
-  $status = $LASTEXITCODE
-  if ($status -eq 0) { throw "Missing browser credentials incorrectly passed strict readiness." }
-  if ($output -notmatch "Browser worker token:.*NOT READY|NOT READY.*Browser worker token") {
-    # Diagnostic format is '[NOT READY] Browser worker token: ...'
-    if ($output -notmatch "\[NOT READY\] Browser worker token") { throw "Missing browser token check was not reported." }
+  function Assert-NotReady([string]$label, [string[]]$requiredMarkers) {
+    $output = & $shell -NoProfile -File $script -Root $root -Strict 2>&1 | Out-String
+    $status = $LASTEXITCODE
+    if ($status -eq 0) { throw "$label incorrectly passed strict readiness." }
+    foreach ($marker in $requiredMarkers) {
+      if ($output -notmatch [regex]::Escape($marker)) {
+        throw "$label did not report the required failure: $marker"
+      }
+    }
+    if ($output -match [regex]::Escape($privateMarker)) {
+      throw "$label leaked a secret test marker."
+    }
+    Write-Host ("PASS: " + $label)
+    $global:LASTEXITCODE = 0
   }
-  if ($output -notmatch "\[NOT READY\] Browser worker:") { throw "Worker authorization failure was not reported." }
-  if ($output -match [regex]::Escape($privateMarker)) { throw "Sensitive test marker appeared in diagnostics." }
-  Write-Host "PASS: strict mode fails on missing browser credential and does not expose configured runtime token."
+  Assert-NotReady "missing browser worker token" @("[NOT READY] Browser worker token:", "[NOT READY] Browser worker:")
+  [IO.File]::WriteAllText((Join-Path $root "browser-worker\.env"), ("BROWSER_WORKER_TOKEN=" + $privateMarker + ("y" * 40)))
+  [IO.File]::WriteAllText((Join-Path $root "runtime\.env"), "RUNTIME_TOKEN=")
+  Assert-NotReady "missing runtime token" @("[NOT READY] Fastify token:", "[NOT READY] Fastify API:")
+  [IO.File]::WriteAllText((Join-Path $root "runtime\.env"), ("RUNTIME_TOKEN=" + $privateMarker + ("x" * 40)))
+  [IO.File]::WriteAllText((Join-Path $root "browser-worker\.env"), "BROWSER_WORKER_TOKEN=")
+  Assert-NotReady "incomplete local authentication" @("[NOT READY] Browser worker token:", "Diagnostics finished:")
   # A child PowerShell deliberately failed. Clear its exit state so CI reports
   # the ASSERTIONS (rather than the child) as the test result.
   $global:LASTEXITCODE = 0
