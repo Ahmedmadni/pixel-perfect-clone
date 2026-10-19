@@ -131,6 +131,30 @@ jobs:
             echo "Profile cookie was not recovered safely after restart" >&2
             exit 1
           fi
+      - name: Verify worker outage fails closed and recovery remains STOPPED
+        run: |
+          docker compose -f compose.browser.yml stop browser-worker
+          if curl --fail --silent --show-error --max-time 3 -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-should-be-offline.json 2>/dev/null; then
+            echo "Worker endpoint remained reachable after container stop" >&2
+            exit 1
+          fi
+          docker compose -f compose.browser.yml up -d --no-deps browser-worker
+          recovered=0
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 4 -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-recovered.json 2>/dev/null; then
+              if node -e 'const h=require("/tmp/paw-recovered.json");process.exit(h.ready && h.novnc && h.mode==="STOPPED" && h.viewOnly && h.ciProfileRecovered===true ? 0 : 1)'; then
+                recovered=1
+                break
+              fi
+            fi
+            sleep 2
+          done
+          if [ "$recovered" -ne 1 ]; then
+            echo "Worker did not recover in STOPPED view-only state with disposable profile preserved" >&2
+            exit 1
+          fi
+          echo "PASS: offline worker is unreachable; restart never restores agent ownership"
+
       - name: Refuse copying active Chromium profile then encrypt stopped profile
         run: |
           pass='Temporary CI Chromium passphrase - no real cookies 2026'
