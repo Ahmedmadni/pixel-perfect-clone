@@ -34,7 +34,13 @@ if (Get-Command docker -ErrorAction SilentlyContinue) {
   & docker info *> $null
   $engine = $LASTEXITCODE -eq 0
 }
-Check "Docker Engine" $engine "running with local Linux container support"
+Check "Docker Engine" $engine "Docker daemon reachable"
+if ($engine) {
+  $dockerOs = (& docker info --format "{{.OSType}}" 2>$null | Out-String).Trim()
+  Check "Docker Linux containers" ($LASTEXITCODE -eq 0 -and $dockerOs -eq "linux") "Linux container mode required for Chromium and PostgreSQL"
+} else {
+  Check "Docker Linux containers" $false "cannot check container mode without Docker Engine"
+}
 if($engine -and (Test-Path (Join-Path $root "local\.env"))) {
   Push-Location $root
   try {
