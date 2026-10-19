@@ -34,3 +34,15 @@ test("Windows production startup cannot enable CI browser bypass", () => {
     assert.doesNotMatch(source, /--no-sandbox|--disable-setuid-sandbox|BROWSER_CI_TRUSTED_SMOKE\s*[=:]\s*true/i, name);
   }
 });
+
+test("Windows stop script only stops named containers and preserves volumes", () => {
+  const source = read("scripts/windows/stop.ps1");
+  const commands = source.split("\n").filter((line) => /^\s*& docker compose\b/.test(line));
+  assert.equal(commands.length, 2, "Expected exactly two scoped compose commands");
+  assert.match(commands[0], /-f "compose\.browser\.yml" stop browser-worker/);
+  assert.match(commands[1], /--env-file "local\/\.env" -f "compose\.database\.yml" stop database/);
+  for (const line of commands) {
+    assert.doesNotMatch(line, /\bdown\b|\brm\b|\bprune\b|--volumes|\s-v\b/i);
+  }
+  assert.doesNotMatch(source, /^\s*(?:Remove-Item|rm|rmdir|del)\b/im);
+});
