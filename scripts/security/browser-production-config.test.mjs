@@ -56,7 +56,7 @@ test("Windows browser restart is scoped, preserves volumes and waits for STOPPED
   assert.match(source, /\$health\.mode -eq "STOPPED"/);
   assert.match(source, /\$before\.mode -ne "STOPPED"/);
   assert.match(source, /Cannot verify browser ownership before restart/);
-  assert.ok(source.indexOf('$before.mode -ne "STOPPED"') < source.indexOf('stop browser-worker'), "pre-stop ownership check must precede container stop");
+  assert.ok(source.indexOf('$before.mode -ne "STOPPED"') < source.indexOf('stop -t 30 browser-worker'), "pre-stop ownership check must precede container stop");
   assert.match(source, /\$dockerOs -ne "linux"/);
   assert.match(source, /BROWSER_CI_TRUSTED_SMOKE/);
   assert.doesNotMatch(source, /^\s*(?:Remove-Item|rm|rmdir|del)\b/im);
