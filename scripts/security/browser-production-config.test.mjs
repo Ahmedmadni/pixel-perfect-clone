@@ -46,3 +46,16 @@ test("Windows stop script only stops named containers and preserves volumes", ()
   }
   assert.doesNotMatch(source, /^\s*(?:Remove-Item|rm|rmdir|del)\b/im);
 });
+
+test("Windows browser restart is scoped, preserves volumes and waits for STOPPED", () => {
+  const source = read("scripts/windows/restart-browser.ps1");
+  const commands = source.split("\n").filter((line) => /^\s*& docker compose\b/.test(line));
+  assert.equal(commands.length, 2);
+  assert.match(commands[0], /-f "compose\.browser\.yml" stop browser-worker/);
+  assert.match(commands[1], /-f "compose\.browser\.yml" up -d --no-deps browser-worker/);
+  assert.match(source, /\$health\.mode -eq "STOPPED"/);
+  assert.match(source, /\$dockerOs -ne "linux"/);
+  assert.match(source, /BROWSER_CI_TRUSTED_SMOKE/);
+  assert.doesNotMatch(source, /^\s*(?:Remove-Item|rm|rmdir|del)\b/im);
+  for (const line of commands) assert.doesNotMatch(line, /\bdown\b|\brm\b|\bprune\b|--volumes|\s-v\b/i);
+});
