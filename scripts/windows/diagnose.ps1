@@ -4,10 +4,10 @@
   database, permissions, sessions or user profiles. Never prints secrets.
 #>
 [CmdletBinding()]
-param([switch]$TestInference, [switch]$Strict)
+param([switch]$TestInference, [switch]$Strict, [string]$Root = "")
 $ErrorActionPreference = "Stop"
 $script:checksFailed = 0
-$root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
+$root = if ([string]::IsNullOrWhiteSpace($Root)) { [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..")) } else { [System.IO.Path]::GetFullPath($Root) }
 $runtimeConfig = Join-Path $root "runtime\.env"
 $browserConfig = Join-Path $root "browser-worker\.env"
 function Check([string]$name, [bool]$ok, [string]$detail) {
