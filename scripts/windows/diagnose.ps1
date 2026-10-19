@@ -49,6 +49,7 @@ $workerToken = Read-EnvValue $browserConfig "BROWSER_WORKER_TOKEN"
 if($runtimeToken.Length -ge 32) {
   try {
     $h=Invoke-RestMethod -Uri "http://127.0.0.1:4100/v1/health" -TimeoutSec 6
+    Check "Fastify API" ([bool]$h.services) "local health endpoint reachable with service details"
     foreach($service in $h.services) {
       Check ("Fastify: "+$service.name) ($service.status -eq "up") ("status "+$service.status)
     }
@@ -59,7 +60,9 @@ if($runtimeToken.Length -ge 32) {
   }
 } else {
   Check "Fastify token" $false "runtime/.env token missing or invalid"
+  Check "Fastify API" $false "cannot verify authenticated local API without configured token"
 }
+Check "Browser worker token" ($workerToken.Length -ge 32) "browser-worker/.env token present"
 if($workerToken.Length -ge 32) {
   try {
     $h=Invoke-RestMethod -Uri "http://127.0.0.1:4300/health" -Headers @{Authorization=("Bearer "+$workerToken)} -TimeoutSec 6
@@ -70,6 +73,8 @@ if($workerToken.Length -ge 32) {
   } catch {
     Check "Browser worker" $false "local worker is offline or not authenticated"
   }
+} else {
+  Check "Browser worker" $false "cannot verify local worker without configured token"
 }
 try {
   $models=Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 5
