@@ -66,6 +66,9 @@ jobs:
         run: node --check src/server.mjs && node --check src/policy.mjs
       - name: Test agent domain and ownership policies
         run: npm test
+      - name: Assert production browser security configuration
+        working-directory: .
+        run: node --test scripts/security/browser-production-config.test.mjs
 
   postgres-integration:
     name: PostgreSQL migrations and real database integration
