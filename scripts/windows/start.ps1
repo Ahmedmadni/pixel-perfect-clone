@@ -22,6 +22,10 @@ if (-not (Get-Command bun -ErrorAction SilentlyContinue)) { throw "Bun is not in
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw "Node/npm are not installed." }
 & docker info *> $null
 if ($LASTEXITCODE -ne 0) { throw "Docker Engine is not running. Start Docker Desktop/WSL2." }
+$dockerOs = (& docker info --format "{{.OSType}}" 2>$null | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $dockerOs -ne "linux") {
+  throw "Docker must use Linux containers for Chromium/PostgreSQL. Switch Docker Desktop to Linux containers; do not disable Chromium sandbox."
+}
 
 $runtimeText = [System.IO.File]::ReadAllText($runtimeEnv)
 $matchToken = [regex]::Match($runtimeText, "(?m)^BROWSER_WORKER_TOKEN=(.+)$")
