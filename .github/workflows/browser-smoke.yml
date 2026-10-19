@@ -186,7 +186,9 @@ jobs:
 
       - name: PostgreSQL outage and recovery are reflected without resuming agent
         run: |
-          docker stop "$(docker ps -q --filter ancestor=postgres:16-alpine)" || true
+          db="$(docker ps -q --filter ancestor=postgres:16-alpine | head -1)"
+          test -n "$db" || { echo "Disposable PostgreSQL container unavailable" >&2; exit 1; }
+          docker stop "$db"
           # The service container is managed by Actions, not compose; fail if health stays UP.
           unavailable=0
           for i in $(seq 1 20); do
@@ -196,7 +198,7 @@ jobs:
             sleep 1
           done
           test "$unavailable" -eq 1 || { echo "DB outage not detected" >&2; exit 1; }
-          db="$(docker ps -aq --filter ancestor=postgres:16-alpine | head -1)"
+          test -n "$db"
           test -n "$db"
           docker start "$db"
           recovered=0
