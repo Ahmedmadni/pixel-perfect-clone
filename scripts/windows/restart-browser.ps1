@@ -31,6 +31,16 @@ if($env:BROWSER_CI_TRUSTED_SMOKE -eq "true" -or (Read-EnvValue $envPath "BROWSER
 if($LASTEXITCODE -ne 0) { throw "Docker Engine is not running; no changes made." }
 $dockerOs = (& docker info --format "{{.OSType}}" 2>$null | Out-String).Trim()
 if($LASTEXITCODE -ne 0 -or $dockerOs -ne "linux") { throw "Docker must use Linux containers; no changes made." }
+# Refuse to interrupt a live owner/agent handoff. An unavailable worker is
+# not evidence of an idle browser, so recovery must be handled separately.
+try {
+  $before = Invoke-RestMethod -Uri "http://127.0.0.1:4300/health" -Headers @{Authorization=("Bearer "+$token)} -TimeoutSec 5
+} catch {
+  throw "Cannot verify browser ownership before restart; no containers changed."
+}
+if(-not $before.ready -or $before.mode -ne "STOPPED") {
+  throw "Browser must already be STOPPED before maintenance restart. Stop the active task through the trusted local UI first."
+}
 Push-Location $root
 try {
   & docker compose -f "compose.browser.yml" stop browser-worker
