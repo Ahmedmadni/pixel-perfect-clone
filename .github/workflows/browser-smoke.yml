@@ -184,6 +184,33 @@ jobs:
           if [ "$recovered" -ne 1 ]; then echo "Ollama service recovery not reflected" >&2; exit 1; fi
           echo "PASS: model-service loss and recovery reflected by real Fastify health"
 
+      - name: PostgreSQL outage and recovery are reflected without resuming agent
+        run: |
+          docker stop "$(docker ps -q --filter ancestor=postgres:16-alpine)" || true
+          # The service container is managed by Actions, not compose; fail if health stays UP.
+          unavailable=0
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 3 -H "Authorization: Bearer $RUNTIME_TOKEN" http://127.0.0.1:4100/v1/health > /tmp/paw-db-down.json 2>/dev/null; then
+              if node -e 'const h=require("/tmp/paw-db-down.json");process.exit(h.services?.some(s=>s.name==="postgres" && s.status!=="up")?0:1)'; then unavailable=1; break; fi
+            fi
+            sleep 1
+          done
+          test "$unavailable" -eq 1 || { echo "DB outage not detected" >&2; exit 1; }
+          db="$(docker ps -aq --filter ancestor=postgres:16-alpine | head -1)"
+          test -n "$db"
+          docker start "$db"
+          recovered=0
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 3 -H "Authorization: Bearer $RUNTIME_TOKEN" http://127.0.0.1:4100/v1/health > /tmp/paw-db-up.json 2>/dev/null; then
+              if node -e 'const h=require("/tmp/paw-db-up.json");process.exit(h.services?.some(s=>s.name==="postgres" && s.status==="up")?0:1)'; then recovered=1; break; fi
+            fi
+            sleep 2
+          done
+          test "$recovered" -eq 1 || { echo "DB recovery not detected" >&2; exit 1; }
+          curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-browser-after-db.json
+          node -e 'const h=require("/tmp/paw-browser-after-db.json");process.exit(h.mode==="STOPPED" && h.viewOnly ? 0 : 1)'
+          echo "PASS: database health recovers without granting agent control"
+
       - name: Refuse copying active Chromium profile then encrypt stopped profile
         run: |
           pass='Temporary CI Chromium passphrase - no real cookies 2026'
