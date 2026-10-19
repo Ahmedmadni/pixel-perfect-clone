@@ -207,6 +207,16 @@ Stopping containers preserves the PostgreSQL and Chromium volumes. **Do not run
 `docker compose down -v` on your personal installation**, as it deletes their
 volumes and can destroy database records and browser sessions.
 
+### Safe local container stop (new helper)
+
+From the repository root, stop only the project's browser and database containers without removing any Docker volumes:
+
+```powershell
+.\scripts\windows\stop.ps1
+```
+
+The script deliberately does **not** terminate the separate Fastify/UI PowerShell windows. Close those windows manually. It never invokes `docker compose down -v` or deletes browser sessions, database volumes, local settings or backups. Restart normally with `.\scripts\windows\launch.ps1`. It does not validate a successful shutdown on the owner's computer until run there.
+
 ## Verification limits
 
 GitHub Actions checks the frontend, runtime, SQL migrations, domain policies and
