@@ -145,7 +145,9 @@ export class ReadOnlyAgent {
       const plan=parseBrowserPlan(raw);
       if(plan.action==="finish"){
         if(completed.length===0) {
-          throw new Error("لم تُنفذ أي خطوة على التاب؛ ربما تحتاج العملية لتدخل يدوي: "+plan.message.slice(0,100));
+          // A model may correctly stop because a task is unsupported.
+          // Never forward a claim of execution when no browser action occurred.
+          return "لم ينفذ المساعد أي إجراء على التبويب. أوقف المهمة دون إرسال أو نشر أو تعديل. راجع الصفحة يدويًا إذا كانت المهمة تتطلب إجراءً خارج الصلاحيات الحالية.";
         }
         return "ما تم تنفيذه بالفعل على التاب:\n"+completed.join("\n")+
           "\n\nملاحظة النموذج (ليست دليلًا على تنفيذ إضافي): "+plan.message;
