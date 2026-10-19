@@ -130,13 +130,13 @@ jobs:
             Write-Host "Valid syntax: $path"
           }
       - name: Strict Windows diagnostics must signal NOT READY when local services are absent
-        shell: pwsh
+        shell: bash
         run: |
-          & ./scripts/windows/diagnose.ps1 -Strict
-          if ($LASTEXITCODE -eq 0) {
-            throw "Strict doctor erroneously reported ready without local configuration"
-          }
-          Write-Host "PASS: strict diagnostics failed closed without local settings"
+          if pwsh -NoProfile -File scripts/windows/diagnose.ps1 -Strict; then
+            echo "Strict diagnostics incorrectly reported ready without local configuration" >&2
+            exit 1
+          fi
+          echo "PASS: unconfigured workstation returns a nonzero readiness status"
       - name: Validate local database Compose config with throwaway env
         run: |
           mkdir -p local
