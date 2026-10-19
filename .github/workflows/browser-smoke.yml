@@ -127,6 +127,8 @@ jobs:
             sleep 2
           done
           if [ "$ready" -ne 1 ]; then
+            echo "Browser health and profile recovery diagnostics (synthetic CI only):" >&2
+            if [ -f /tmp/paw-profile-after.json ]; then node -e 'const h=require("/tmp/paw-profile-after.json");console.error(JSON.stringify({ready:h.ready,novnc:h.novnc,mode:h.mode,viewOnly:h.viewOnly,ciProfileRecovered:h.ciProfileRecovered}))'; fi
             docker compose -f compose.browser.yml logs --no-color --tail=120
             echo "Profile cookie was not recovered safely after restart" >&2
             exit 1
@@ -198,7 +200,6 @@ jobs:
             sleep 1
           done
           test "$unavailable" -eq 1 || { echo "DB outage not detected" >&2; exit 1; }
-          test -n "$db"
           test -n "$db"
           docker start "$db"
           recovered=0
