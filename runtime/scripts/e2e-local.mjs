@@ -75,7 +75,66 @@ assert.equal(historical.status,200,"Chat history should come from PostgreSQL");
 const forbidden=await request("/v1/approvals",{headers:{Origin:"https://untrusted.example"}});
 assert.equal(forbidden.status,403,"Cross-origin forged request rejected");
 
+// Real PostgreSQL approval and permission flows, with no external send adapter.
+const domain="e2e-" + Date.now() + ".example.org";
+const createDomain=await request("/v1/accounts",{
+  method:"POST",body:JSON.stringify({domain,label:"CI disposable offline domain"}),
+});
+assert.equal(createDomain.status,201,"Domain registration must be persisted");
+assert.equal(createDomain.json.canReview,false,"Site access must start denied");
+assert.equal(createDomain.json.canExternalWrite,false,"External writes must remain forbidden");
+const policyId=createDomain.json.id;
+const allow=await request("/v1/accounts/"+policyId+"/review",{
+  method:"POST",body:JSON.stringify({allow:true}),
+});
+assert.equal(allow.status,200);
+assert.equal(allow.json.canReview,true);
+assert.equal(allow.json.canExternalWrite,false);
+const deny=await request("/v1/accounts/"+policyId+"/review",{
+  method:"POST",body:JSON.stringify({allow:false}),
+});
+assert.equal(deny.status,200);
+assert.equal(deny.json.canReview,false);
+const accounts=await request("/v1/accounts");
+assert.equal(accounts.status,200);
+assert.ok(accounts.json.some((item)=>item.id===policyId&&!item.canReview),
+  "Revocation must be durable in real PostgreSQL");
+
+const proposal=await request("/v1/approvals",{
+  method:"POST",
+  body:JSON.stringify({
+    kind:"external_message",
+    action:"Review non-executable draft",
+    target:"Offline CI fixture (not a real account)",
+    preview:"This is a local draft and must NOT be sent.",
+  }),
+});
+assert.equal(proposal.status,201,"User approval draft must be persisted");
+assert.equal(proposal.json.executable,false);
+assert.equal(proposal.json.status,"pending");
+const digest=proposal.json.payloadDigest;
+assert.match(digest,/^[a-f0-9]{64}$/);
+const approvalId=proposal.json.id;
+const forged=await request("/v1/approvals/"+approvalId,{
+  method:"POST",body:JSON.stringify({decision:"approve",expectedDigest:"0".repeat(64)}),
+});
+assert.equal(forged.status,409,"Changed draft digest must be denied");
+const approved=await request("/v1/approvals/"+approvalId,{
+  method:"POST",body:JSON.stringify({decision:"approve",expectedDigest:digest}),
+});
+assert.equal(approved.status,200);
+assert.equal(approved.json.executable,false,"Approval never dispatches writes");
+assert.equal(approved.json.status,"approved");
+const replay=await request("/v1/approvals/"+approvalId,{
+  method:"POST",body:JSON.stringify({decision:"approve",expectedDigest:digest}),
+});
+assert.equal(replay.status,409,"One-time approval must reject replay");
+const approvals=await request("/v1/approvals");
+assert.ok(approvals.json.some((item)=>item.id===approvalId&&item.status==="approved"));
+const messagesAfter=await request("/v1/chat/messages");
+assert.equal(messagesAfter.status,200,"Approval must not alter messaging state");
+
 const stop=await request("/v1/agent/control",{method:"POST",body:JSON.stringify({type:"EMERGENCY_STOP"})});
 assert.equal(stop.status,200);
 assert.equal(stop.json.snapshot.state,"STOPPED");
-console.log("PASS: Real browser tabs/control + Fastify/PostgreSQL + synthetic Ollama streaming + auth + stop");
+console.log("PASS: Real browser tabs/control + Fastify/PostgreSQL + synthetic Ollama streaming + auth + immutable approvals + deny-by-default site permissions + stop");
