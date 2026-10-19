@@ -27,6 +27,9 @@ try {
   if ($output -notmatch "\[NOT READY\] Browser worker:") { throw "Worker authorization failure was not reported." }
   if ($output -match [regex]::Escape($privateMarker)) { throw "Sensitive test marker appeared in diagnostics." }
   Write-Host "PASS: strict mode fails on missing browser credential and does not expose configured runtime token."
+  # A child PowerShell deliberately failed. Clear its exit state so CI reports
+  # the ASSERTIONS (rather than the child) as the test result.
+  $global:LASTEXITCODE = 0
 } finally {
   if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
 }
