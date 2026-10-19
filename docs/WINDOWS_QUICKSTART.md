@@ -178,11 +178,13 @@ restarts. Browser storage may contain login cookies and is **not automatically
 encrypted at rest**; secure your computer with full-disk encryption, strong login
 and access controls. Do not upload Docker volumes or .env files to GitHub.
 
-By default the agent has no site permissions. If you later opt in to a
-read-only review, you must register and approve the domain in the Accounts
-screen **and** explicitly configure the browser-worker local domain allowlist.
-No auto-publishing, sending, account modification or unrestricted AI browsing
-has been enabled.
+The assistant is OFF by default. If you explicitly enable it, it may act
+only on the currently selected public HTTPS tab, pinned to the exact origin
+and restricted to a small number of safe operations. You can optionally add
+`BROWSER_AGENT_DOMAINS` as an additional site allowlist. Registering a domain
+in the Accounts UI alone does not authorize any external write action.
+No auto-publishing, message sending, account modification or unrestricted
+multi-tab automation is enabled.
 
 The CI test that reports successful Chrome/noVNC startup uses a temporary
 offline-only Chromium configuration because GitHub runner's AppArmor restrictions

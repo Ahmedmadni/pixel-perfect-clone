@@ -38,7 +38,7 @@ All requests require `Authorization: Bearer <BROWSER_WORKER_TOKEN>`. Requests wi
 | POST | /agent/inspect | `{"tabId":"..."}` | AGENT_ACTIVE read-only |
 | POST | /agent/navigate | `{"tabId":"...","url":"https://..."}` | AGENT_ACTIVE, HTTPS + approved domain only |
 
-The optional supervised read-only reviewer requires `BROWSER_ENABLE_READONLY_AGENT=true` **and** a non-empty `BROWSER_AGENT_DOMAINS` allowlist. It can inspect only approved HTTPS top-level pages, and prepares draft reports via local Ollama. Account posting, message sending and other writes remain disabled.
+The supervised reviewer requires an explicit local opt-in (`BROWSER_ENABLE_READONLY_AGENT=true`) and a user-selected active tab. The worker pins that tab and its exact public HTTPS origin. `BROWSER_AGENT_DOMAINS` is an **optional, additional restriction**; when populated, the current tab must match it. Account posting, message sending and other external writes remain disabled.
 
 At this milestone the worker **cannot post, reply, send messages, delete, or upload** to external websites. No account permissions are automatically granted. Page text from `/agent/inspect` is untrusted input, not AI instructions.
 

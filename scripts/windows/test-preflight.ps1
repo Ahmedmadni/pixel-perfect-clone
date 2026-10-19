@@ -66,8 +66,12 @@ try {
   Put "browser-worker\.env" $goodWorker
 
   Put "browser-worker\.env" ($goodWorker.Replace("BROWSER_ENABLE_READONLY_AGENT=false","BROWSER_ENABLE_READONLY_AGENT=true"))
-  Check "agent with no approved sites is denied" $false
+  Check "user-selected tab does not require an extra global allowlist" $true
   Put "browser-worker\.env" $goodWorker
+
+  Put "browser-worker\\.env" ($goodWorker.Replace("BROWSER_ENABLE_READONLY_AGENT=false","BROWSER_ENABLE_READONLY_AGENT=invalid"))
+  Check "unknown agent permission flag forbidden" $false
+  Put "browser-worker\\.env" $goodWorker
 
   Put ".env.local" ($goodFrontend.Replace("http://127.0.0.1:4100","https://remote.example:4100"))
   Check "remote API URL is forbidden" $false

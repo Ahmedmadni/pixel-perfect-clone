@@ -223,6 +223,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Test launch preflight on 10 temporary Windows configurations
+      - name: Test launch preflight on 11 temporary Windows configurations
         shell: powershell
         run: .\\scripts\\windows\\test-preflight.ps1

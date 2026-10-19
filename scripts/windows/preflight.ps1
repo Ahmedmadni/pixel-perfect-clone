@@ -113,12 +113,13 @@ if ($worker.ContainsKey("BROWSER_CI_TRUSTED_SMOKE") -and
 if ($env:BROWSER_CI_TRUSTED_SMOKE -eq "true") {
   Fail "Unsafe CI mode is set in the process environment."
 }
-if ($worker.ContainsKey("BROWSER_ENABLE_READONLY_AGENT") -and
-    $worker["BROWSER_ENABLE_READONLY_AGENT"].ToLowerInvariant() -eq "true") {
-  if (-not $worker.ContainsKey("BROWSER_AGENT_DOMAINS") -or
-      [string]::IsNullOrWhiteSpace($worker["BROWSER_AGENT_DOMAINS"])) {
-    Fail "Agent is enabled without any approved HTTPS site domains."
+if ($worker.ContainsKey("BROWSER_ENABLE_READONLY_AGENT")) {
+  $flag = $worker["BROWSER_ENABLE_READONLY_AGENT"].ToLowerInvariant()
+  if (@("true","false") -cnotcontains $flag) {
+    Fail "BROWSER_ENABLE_READONLY_AGENT must be true or false."
   }
 }
+# A user-selected tab is always scoped to its exact HTTPS origin by the worker.
+# BROWSER_AGENT_DOMAINS is an optional, additional domain-level restriction.
 Write-Host "[OK] Local secrets, service origins, worker handoff and production browser configuration are consistent." -ForegroundColor Green
 Write-Host "[OK] This validation did not connect to websites, print tokens or modify any local file."
