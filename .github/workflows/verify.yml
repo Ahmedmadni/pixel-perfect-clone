@@ -240,3 +240,6 @@ jobs:
       - name: Test launch preflight on 11 temporary Windows configurations
         shell: powershell
         run: .\\scripts\\windows\\test-preflight.ps1
+      - name: Test strict diagnostic failure handling on native Windows PowerShell
+        shell: pwsh
+        run: ./scripts/windows/test-diagnose.ps1
