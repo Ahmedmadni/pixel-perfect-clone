@@ -15,6 +15,18 @@ No paid cloud GPU, cloud database or browser-hosting service is needed.
 You must trust the **local** dashboard at 127.0.0.1; the hosted Lovable preview
 cannot use your private localhost credentials or access your PC browser by itself.
 
+## فحص إعدادات Windows قبل بدء التشغيل
+
+أُضيف فحص محلي للقراءة فقط يتم تشغيله تلقائيًا من `scripts/windows/start.ps1` **قبل تشغيل Docker أو Fastify**. يفحص تطابق رموز API وعامل المتصفح دون إظهارها، وتطابق بيانات PostgreSQL، وصحة روابط الخدمات المحلية وإعدادات CORS، ومنع استخدام وضع CI الذي يعطّل Sandbox في جلسة متصفح حقيقية.
+
+يمكن إجراء الفحص بنفسك دون بدء خدمات أو تعديل ملفات:
+
+```powershell
+.\\scripts\\windows\\preflight.ps1
+```
+
+إذا ظهرت رسالة منع، يجب إصلاح الإعدادات محليًا دون نشر ملفات `.env` أو إرسال كلمات المرور. لن يُصلح الفحص الأسرار أو يستبدلها تلقائيًا.
+
 ## First run
 
 Open PowerShell in the repository root (clone via GitHub or download the repository ZIP):

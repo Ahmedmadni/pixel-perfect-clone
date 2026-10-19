@@ -114,7 +114,7 @@ jobs:
       - name: Parse local Windows scripts without executing them
         shell: pwsh
         run: |
-          $paths = @("scripts/windows/launch.ps1", "scripts/windows/setup.ps1", "scripts/windows/start.ps1", "scripts/windows/diagnose.ps1", "scripts/windows/backup.ps1", "scripts/windows/restore.ps1", "scripts/windows/scheduled-backup.ps1", "scripts/windows/browser-profile.ps1")
+          $paths = @("scripts/windows/launch.ps1", "scripts/windows/setup.ps1", "scripts/windows/start.ps1", "scripts/windows/diagnose.ps1", "scripts/windows/backup.ps1", "scripts/windows/restore.ps1", "scripts/windows/scheduled-backup.ps1", "scripts/windows/browser-profile.ps1", "scripts/windows/preflight.ps1", "scripts/windows/test-preflight.ps1")
           foreach ($path in $paths) {
             $tokens = $null
             $parseErrors = $null
@@ -216,3 +216,13 @@ jobs:
         shell: powershell
         run: |
           .\scripts\windows\scheduled-backup.ps1 -SelfTest
+
+  windows-launch-preflight:
+    name: Windows local startup safety configuration tests
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test launch preflight on 10 temporary Windows configurations
+        shell: powershell
+        run: .\\scripts\\windows\\test-preflight.ps1

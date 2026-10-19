@@ -15,6 +15,8 @@ $frontEnv = Join-Path $root ".env.local"
 foreach ($p in @($dbEnv,$runtimeEnv,$workerEnv,$frontEnv)) {
   if (-not (Test-Path $p)) { throw "Missing $p. Run scripts\windows\setup.ps1 first." }
 }
+# Check local settings and secrets BEFORE launching any Docker container.
+& (Join-Path $PSScriptRoot "preflight.ps1")
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is not installed." }
 if (-not (Get-Command bun -ErrorAction SilentlyContinue)) { throw "Bun is not installed." }
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw "Node/npm are not installed." }
