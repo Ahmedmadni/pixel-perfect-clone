@@ -135,12 +135,14 @@ describe("supervised read-only AI agent", () => {
     expect(f.actions.every(a=>a.tabId===tabId&&a.action==="scroll")).toBe(true);
     expect(f.records[0]?.result).toContain("أربع خطوات");
   });
-  it("does not report success if Ollama declares a task finished without a browser action",async()=>{
+  it("never trusts an Ollama claim of sending when no browser action occurred",async()=>{
     const f=fixtures({planOutput:'{"action":"finish","message":"تم إرسال الرسالة"}'});
     await f.agent.start({objective:"اضغط زر إرسال",tabId,model:"local-model"});
     await untilDone(f.records);
-    expect(f.records[0]?.status).toBe("failed");
+    expect(f.records[0]?.status).toBe("done");
     expect(f.actions).toHaveLength(0);
+    expect(f.records[0]?.result).toContain("لم ينفذ المساعد أي إجراء");
+    expect(f.records[0]?.result).not.toContain("تم إرسال الرسالة");
   });
   it("rejects unrecognized model tool requests instead of claiming they executed",async()=>{
     const f=fixtures({planOutput:'{"action":"delete_account","target":"all"}'});
