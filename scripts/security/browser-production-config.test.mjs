@@ -40,6 +40,10 @@ test("Windows stop script only stops named containers and preserves volumes", ()
   const commands = source.split("\n").filter((line) => /^\s*& docker compose\b/.test(line));
   assert.equal(commands.length, 4, "Two configs validated before two scoped stops");
   assert.match(source, /Missing local database config; no containers changed/);
+  assert.match(source, /docker info --format "\\{\\{\\.OSType\\}\\}"/);
+  assert.match(source, /\\$dockerOs -ne "linux"/);
+  assert.ok(source.indexOf("docker info --format") < source.indexOf("stop -t 30 browser-worker"));
+
   assert.ok(source.includes('Test-Path -LiteralPath (Join-Path $root "local\\.env")'));
   assert.ok(source.indexOf('Test-Path -LiteralPath (Join-Path $root "local\\.env")') < source.indexOf('stop -t 30 browser-worker'),
     "missing DB config must fail before stopping browser");
