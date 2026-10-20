@@ -40,7 +40,7 @@ test("Windows stop script only stops named containers and preserves volumes", ()
   const commands = source.split("\n").filter((line) => /^\s*& docker compose\b/.test(line));
   assert.equal(commands.length, 2, "Expected exactly two scoped compose commands");
   assert.match(commands[0], /-f "compose\.browser\.yml" stop(?: -t 30)? browser-worker/);
-  assert.match(commands[1], /--env-file "local\/\.env" -f "compose\.database\.yml" stop database/);
+  assert.match(commands[1], /--env-file "local\/\.env" -f "compose\.database\.yml" stop(?: -t 30)? database/);
   for (const line of commands) {
     assert.doesNotMatch(line, /\bdown\b|\brm\b|\bprune\b|--volumes|\s-v\b/i);
   }
