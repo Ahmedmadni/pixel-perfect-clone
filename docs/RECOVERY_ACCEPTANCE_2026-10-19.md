@@ -53,3 +53,7 @@ The local `restart-browser.ps1` maintenance command now verifies **both** `mode=
 The prior `Verify Cloud Development` workflow failures after graceful-stop changes were traced to an outdated expected command pattern in `browser-production-config.test.mjs` for PostgreSQL `stop -t 30 database`. The assertion was corrected without relaxing the prohibition on volume deletion, pruning, or sandbox bypass.
 
 These changes remain subject to GitHub CI on the new commits and Windows-machine verification. A green static check alone does not prove real profile durability on the owner's machine.
+
+## Maintenance lock protocol — 20 October 2026
+
+Chromium now exposes an authenticated backend-only `POST /maintenance/lock`. It acquires a **process-local one-way maintenance lock only while STOPPED**, reapplies view-only mode, and rejects subsequent transitions to MANUAL or AGENT_ACTIVE until the worker process restarts. A Windows maintenance restart calls this endpoint before stopping the named worker container and refuses success unless the lock and view-only state are confirmed. There is deliberately no remote unlock endpoint. No user sessions or personal settings are sent to CI. This closes the handoff race inside the worker process; it cannot protect against unrelated host processes or a different worker instance. The feature still requires fresh CI and owner-machine acceptance.
