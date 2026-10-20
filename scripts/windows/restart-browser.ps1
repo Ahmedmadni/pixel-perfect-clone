@@ -38,7 +38,7 @@ try {
 } catch {
   throw "Cannot verify browser ownership before restart; no containers changed."
 }
-if(-not $before.ready -or $before.mode -ne "STOPPED") {
+if(-not $before.ready -or -not $before.novnc -or -not $before.viewOnly -or $before.mode -ne "STOPPED") {
   throw "Browser must already be STOPPED before maintenance restart. Stop the active task through the trusted local UI first."
 }
 Push-Location $root
@@ -51,7 +51,7 @@ try {
   for($i=0; $i -lt 30; $i++) {
     try {
       $health = Invoke-RestMethod -Uri "http://127.0.0.1:4300/health" -Headers @{Authorization=("Bearer "+$token)} -TimeoutSec 4
-      if($health.ready -and $health.novnc -and $health.mode -eq "STOPPED") { $ready = $true; break }
+      if($health.ready -and $health.novnc -and $health.viewOnly -and $health.mode -eq "STOPPED") { $ready = $true; break }
     } catch {}
     Start-Sleep -Seconds 2
   }
