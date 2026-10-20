@@ -19,6 +19,13 @@ foreach ($config in @("compose.browser.yml", "compose.database.yml")) {
     throw "Missing project compose definition: $config; no containers changed."
   }
 }
+# Validate the engine before any container is stopped.
+& docker info *> $null
+if ($LASTEXITCODE -ne 0) { throw "Docker Engine unavailable; no containers changed." }
+$dockerOs = (& docker info --format "{{.OSType}}" 2>$null | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $dockerOs -ne "linux") {
+  throw "Docker Linux containers required; no containers changed."
+}
 Push-Location $root
 try {
   # Validate BOTH manifests before stopping EITHER service, so missing or
