@@ -57,6 +57,16 @@ try {
   if(-not $current.ready -or -not $current.novnc -or -not $current.viewOnly -or $current.mode -ne "STOPPED") {
     throw "Browser is no longer STOPPED/view-only; no containers changed."
   }
+  # Ask the worker to stay STOPPED; a status probe alone is not a lock.
+  # A concurrent owner handoff may still race, so this is defense in depth.
+  try {
+    $freeze = Invoke-RestMethod -Method POST -Uri "http://127.0.0.1:4300/control" -Headers @{Authorization=("Bearer "+$token)} -ContentType "application/json" -Body '{"state":"STOPPED"}' -TimeoutSec 5
+  } catch {
+    throw "Cannot confirm STOPPED handoff; no containers changed."
+  }
+  if($freeze.mode -ne "STOPPED" -or -not $freeze.viewOnly) {
+    throw "STOPPED handoff failed; no containers changed."
+  }
   & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
   if($LASTEXITCODE -ne 0) { throw "Browser stop failed; startup was not attempted." }
   & docker compose -f "compose.browser.yml" up -d --no-deps browser-worker
