@@ -248,6 +248,7 @@ async function handle(req, res) {
     // For STOP, apply immediately; don't wait for a pending read-only agent task.
     return json(res, 200, await setMode(data.state, data.tabId));
   }
+  if (maintenanceLocked) return json(res, 409, {error: "maintenance_locked"});
   const commands = {
     "/tabs/new": ["user", "new"],
     "/tabs/activate": ["user", "activate"],
