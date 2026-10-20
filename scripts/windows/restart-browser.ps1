@@ -47,6 +47,16 @@ Push-Location $root
 try {
   & docker compose -f "compose.browser.yml" config --quiet
   if ($LASTEXITCODE -ne 0) { throw "Browser compose configuration invalid; no containers changed." }
+  # Recheck ownership immediately before the first state-changing operation.
+  # The earlier health check may have become stale while validating compose.
+  try {
+    $current = Invoke-RestMethod -Uri "http://127.0.0.1:4300/health" -Headers @{Authorization=("Bearer "+$token)} -TimeoutSec 5
+  } catch {
+    throw "Browser ownership changed or became unreachable; no containers changed."
+  }
+  if(-not $current.ready -or -not $current.novnc -or -not $current.viewOnly -or $current.mode -ne "STOPPED") {
+    throw "Browser is no longer STOPPED/view-only; no containers changed."
+  }
   & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
   if($LASTEXITCODE -ne 0) { throw "Browser stop failed; startup was not attempted." }
   & docker compose -f "compose.browser.yml" up -d --no-deps browser-worker
