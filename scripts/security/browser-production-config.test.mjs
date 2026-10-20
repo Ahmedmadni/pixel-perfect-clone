@@ -38,14 +38,16 @@ test("Windows production startup cannot enable CI browser bypass", () => {
 test("Windows stop script only stops named containers and preserves volumes", () => {
   const source = read("scripts/windows/stop.ps1");
   const commands = source.split("\n").filter((line) => /^\s*& docker compose\b/.test(line));
-  assert.equal(commands.length, 2, "Expected exactly two scoped compose commands");
+  assert.equal(commands.length, 4, "Two configs validated before two scoped stops");
   assert.match(source, /Missing local database config; no containers changed/);
   assert.ok(source.includes('Test-Path -LiteralPath (Join-Path $root "local\\.env")'));
   assert.ok(source.indexOf('Test-Path -LiteralPath (Join-Path $root "local\\.env")') < source.indexOf('stop -t 30 browser-worker'),
     "missing DB config must fail before stopping browser");
 
-  assert.match(commands[0], /-f "compose\.browser\.yml" stop(?: -t 30)? browser-worker/);
-  assert.match(commands[1], /--env-file "local\/\.env" -f "compose\.database\.yml" stop(?: -t 30)? database/);
+  assert.match(commands[0], /compose\.browser\.yml" config --quiet/);
+  assert.match(commands[1], /compose\.database\.yml" config --quiet/);
+  assert.match(commands[2], /compose\.browser\.yml" stop -t 30 browser-worker/);
+  assert.match(commands[3], /compose\.database\.yml" stop -t 30 database/);
   for (const line of commands) {
     assert.doesNotMatch(line, /\bdown\b|\brm\b|\bprune\b|--volumes|\s-v\b/i);
   }
