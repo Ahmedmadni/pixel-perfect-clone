@@ -41,8 +41,12 @@ try {
 if(-not $before.ready -or -not $before.novnc -or -not $before.viewOnly -or $before.mode -ne "STOPPED") {
   throw "Browser must already be STOPPED before maintenance restart. Stop the active task through the trusted local UI first."
 }
+$composePath = Join-Path $root "compose.browser.yml"
+if (-not (Test-Path -LiteralPath $composePath)) { throw "Browser compose definition missing; no containers changed." }
 Push-Location $root
 try {
+  & docker compose -f "compose.browser.yml" config --quiet
+  if ($LASTEXITCODE -ne 0) { throw "Browser compose configuration invalid; no containers changed." }
   & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
   if($LASTEXITCODE -ne 0) { throw "Browser stop failed; startup was not attempted." }
   & docker compose -f "compose.browser.yml" up -d --no-deps browser-worker
