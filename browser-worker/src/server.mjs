@@ -20,6 +20,7 @@ if (trustedCiSmoke && (enableReadOnlyAgent || allowedDomains.length > 0)) {
 
 let mode = "STOPPED"; // Fail-closed on every start/restart.
 let generation = 0;
+let maintenanceLocked = false;
 let context;
 let activePage = null;
 let agentScope = null; // Only the selected tab and exact HTTPS origin
@@ -108,6 +109,7 @@ function browserHealth() {
 }
 
 async function setMode(target, tabId = null) {
+  if (maintenanceLocked && target !== "STOPPED") throw new Error("maintenance_locked");
   if (!validHandoff(mode, target)) throw new Error("invalid_handoff");
   // Mark pending agent work invalid BEFORE changing VNC's keyboard/mouse lock.
   if (target === "AGENT_ACTIVE" && mode === "MANUAL") {
@@ -232,6 +234,14 @@ async function handle(req, res) {
 
   if (req.method !== "POST") return json(res, 404, { error: "unknown_route" });
   const data = await bodyJson(req);
+  if (pathname === "/maintenance/lock") {
+    if (maintenanceLocked) return json(res, 200, {...browserHealth(), maintenanceLocked});
+    if (mode !== "STOPPED") return json(res, 409, {error: "maintenance_requires_stopped"});
+    const state = await setMode("STOPPED");
+    if (!state.viewOnly) return json(res, 409, {error: "maintenance_requires_viewonly"});
+    maintenanceLocked = true;
+    return json(res, 200, {...browserHealth(), maintenanceLocked});
+  }
   if (pathname === "/control") {
     if (data.state === "AGENT_ACTIVE" && !enableReadOnlyAgent) return json(res, 409, { error: "agent_disabled" });
     if (typeof data.state !== "string") return json(res, 400, { error: "invalid_control" });
@@ -260,7 +270,7 @@ async function handle(req, res) {
 const server = createServer((req, res) => {
   void handle(req, res).catch((e) => {
     const error = String(e?.message ?? "worker_error");
-    const denied = /^(control_not_owned|invalid_handoff|agent_disabled|agent_domain_not_approved|agent_requires_https|ownership_changed|agent_private_domain_forbidden|agent_left_selected_site|agent_tab_not_selected|agent_action_requires_manual_review)$/.test(error);
+    const denied = /^(control_not_owned|invalid_handoff|agent_disabled|agent_domain_not_approved|agent_requires_https|ownership_changed|agent_private_domain_forbidden|agent_left_selected_site|agent_tab_not_selected|agent_action_requires_manual_review|maintenance_locked|maintenance_requires_stopped|maintenance_requires_viewonly)$/.test(error);
     const invalid = /^(invalid_url|bad_json|body_too_large|unknown_tab|no_tab|last_tab_cannot_close|invalid_agent_action|element_not_found)$/.test(error);
     json(res, denied ? 409 : invalid ? 400 : 503, { error: denied || invalid ? error : "browser_worker_unavailable" });
   });
