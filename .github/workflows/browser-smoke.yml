@@ -115,6 +115,11 @@ jobs:
         run: |
           curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-profile-before.json
           node -e 'const h = require("/tmp/paw-profile-before.json"); if (h.ciProfileRecovered !== false) process.exit(1)'
+          tab_status="$(curl -sS -o /tmp/paw-maintenance-tab-denied.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{}' http://127.0.0.1:4300/tabs/new)"
+          test "$tab_status" = "409"
+          node -e 'const h=require("/tmp/paw-maintenance-tab-denied.json");process.exit(h.error==="maintenance_locked"?0:1)'
           docker compose -f compose.browser.yml restart -t 30 browser-worker
           ready=0
           for i in $(seq 1 40); do
