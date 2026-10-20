@@ -60,11 +60,11 @@ try {
   # Ask the worker to stay STOPPED; a status probe alone is not a lock.
   # A concurrent owner handoff may still race, so this is defense in depth.
   try {
-    $freeze = Invoke-RestMethod -Method POST -Uri "http://127.0.0.1:4300/control" -Headers @{Authorization=("Bearer "+$token)} -ContentType "application/json" -Body '{"state":"STOPPED"}' -TimeoutSec 5
+    $freeze = Invoke-RestMethod -Method POST -Uri "http://127.0.0.1:4300/maintenance/lock" -Headers @{Authorization=("Bearer "+$token)} -ContentType "application/json" -Body '{}' -TimeoutSec 5
   } catch {
     throw "Cannot confirm STOPPED handoff; no containers changed."
   }
-  if($freeze.mode -ne "STOPPED" -or -not $freeze.viewOnly) {
+  if($freeze.mode -ne "STOPPED" -or -not $freeze.viewOnly -or -not $freeze.maintenanceLocked) {
     throw "STOPPED handoff failed; no containers changed."
   }
   & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
