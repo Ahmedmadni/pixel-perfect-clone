@@ -218,6 +218,27 @@ jobs:
           node -e 'const t=require("/tmp/paw-tabs-after-db.json");if(!Array.isArray(t)||t.length<1)process.exit(1)'
           echo "PASS: database health recovers without granting agent control"
 
+      - name: Maintenance lock rejects handoff until fresh worker restart
+        run: |
+          curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{}' http://127.0.0.1:4300/maintenance/lock > /tmp/paw-maintenance-lock.json
+          node -e 'const h=require("/tmp/paw-maintenance-lock.json");process.exit(h.maintenanceLocked && h.mode==="STOPPED" && h.viewOnly ? 0 : 1)'
+          status="$(curl -sS -o /tmp/paw-maintenance-denied.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{"state":"MANUAL"}' http://127.0.0.1:4300/control)"
+          test "$status" = "409"
+          node -e 'const h=require("/tmp/paw-maintenance-denied.json");process.exit(h.error==="maintenance_locked"?0:1)'
+          docker compose -f compose.browser.yml restart -t 30 browser-worker
+          ready=0
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 4 -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-maintenance-recovered.json 2>/dev/null; then
+              if node -e 'const h=require("/tmp/paw-maintenance-recovered.json");process.exit(h.mode==="STOPPED" && h.viewOnly && h.ready && h.novnc && h.ciProfileRecovered===true ? 0 : 1)'; then ready=1; break; fi
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 1 || { echo "Browser recovery after maintenance lock failed" >&2; exit 1; }
+          echo "PASS: maintenance lock blocked ownership handoff; fresh worker recovered STOPPED"
+
       - name: Refuse copying active Chromium profile then encrypt stopped profile
         run: |
           pass='Temporary CI Chromium passphrase - no real cookies 2026'
