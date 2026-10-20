@@ -45,3 +45,11 @@ A later Browser Worker Smoke Test at commit `553b16f9dd026998761cf3af4e3f6a36dfc
 ## Graceful shutdown hardening — October 19, 2026 (later revision)
 
 A follow-up isolated Browser Worker Smoke Test run `39267326070` passed after an earlier Chromium synthetic cookie persistence failure. Because both outcomes have occurred, the production persistence gate remains open. The latest changes increase Docker stop/restart grace periods to **30 seconds** in the offline CI workflow and both Windows maintenance scripts so Chromium has more time to close its persistent context and flush its database-backed cookie store. The static safety regression assertions were updated accordingly. These changes do **not** claim that 30 seconds guarantees durability; acceptance requires green CI and the owner's sandbox-enabled Windows test with a dummy profile.
+
+## Windows view-only restart hardening — 20 October 2026
+
+The local `restart-browser.ps1` maintenance command now verifies **both** `mode=STOPPED` and `viewOnly=true` (as well as browser/noVNC readiness) **before** stopping Chromium and **after** it comes back. A running manual or agent-controlled browser must not be silently restarted. Static security regressions enforce these guards.
+
+The prior `Verify Cloud Development` workflow failures after graceful-stop changes were traced to an outdated expected command pattern in `browser-production-config.test.mjs` for PostgreSQL `stop -t 30 database`. The assertion was corrected without relaxing the prohibition on volume deletion, pruning, or sandbox bypass.
+
+These changes remain subject to GitHub CI on the new commits and Windows-machine verification. A green static check alone does not prove real profile durability on the owner's machine.
