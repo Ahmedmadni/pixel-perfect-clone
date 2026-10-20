@@ -73,7 +73,7 @@ test("Windows browser restart is scoped, preserves volumes and waits for STOPPED
   assert.match(source, /Browser ownership changed or became unreachable; no containers changed/);
   assert.match(source, /Cannot confirm STOPPED handoff; no containers changed/);
   assert.ok(source.includes('/maintenance/lock'));
-  assert.match(source, /\\$freeze\\.maintenanceLocked/);
+  assert.ok(source.includes("$freeze.maintenanceLocked"));
   assert.ok(source.indexOf('$freeze.mode -ne "STOPPED"') < source.indexOf('stop -t 30 browser-worker'));
 
   assert.match(source, /\$current\.mode -ne "STOPPED"/);
