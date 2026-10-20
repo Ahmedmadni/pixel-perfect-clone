@@ -11,14 +11,14 @@ $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
   throw "Docker not found; no changes made."
 }
+if (-not (Test-Path -LiteralPath (Join-Path $root "local\.env"))) {
+  throw "Missing local database config; no containers changed."
+}
 Push-Location $root
 try {
   # No 'down', '--volumes', '-v', pruning or removal options.
   & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
   if ($LASTEXITCODE -ne 0) { throw "Browser worker did not stop cleanly; database was left untouched." }
-  if (-not (Test-Path -LiteralPath (Join-Path $root "local\.env"))) {
-    throw "Missing local database config. Browser stopped; PostgreSQL was left untouched."
-  }
   & docker compose --env-file "local/.env" -f "compose.database.yml" stop -t 30 database
   if ($LASTEXITCODE -ne 0) { throw "PostgreSQL container did not stop cleanly." }
   Write-Host "Docker browser and database stopped. Persistent volumes and secrets remain unchanged." -ForegroundColor Green
