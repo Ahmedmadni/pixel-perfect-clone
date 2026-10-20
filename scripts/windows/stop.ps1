@@ -14,8 +14,19 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 if (-not (Test-Path -LiteralPath (Join-Path $root "local\.env"))) {
   throw "Missing local database config; no containers changed."
 }
+foreach ($config in @("compose.browser.yml", "compose.database.yml")) {
+  if (-not (Test-Path -LiteralPath (Join-Path $root $config))) {
+    throw "Missing project compose definition: $config; no containers changed."
+  }
+}
 Push-Location $root
 try {
+  # Validate BOTH manifests before stopping EITHER service, so missing or
+  # malformed database configuration does not leave a partly stopped stack.
+  & docker compose -f "compose.browser.yml" config --quiet
+  if ($LASTEXITCODE -ne 0) { throw "Invalid browser compose configuration; no containers changed." }
+  & docker compose --env-file "local/.env" -f "compose.database.yml" config --quiet
+  if ($LASTEXITCODE -ne 0) { throw "Invalid database compose configuration; no containers changed." }
   # No 'down', '--volumes', '-v', pruning or removal options.
   & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
   if ($LASTEXITCODE -ne 0) { throw "Browser worker did not stop cleanly; database was left untouched." }
