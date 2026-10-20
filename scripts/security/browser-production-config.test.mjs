@@ -72,7 +72,8 @@ test("Windows browser restart is scoped, preserves volumes and waits for STOPPED
   assert.match(source, /Cannot verify browser ownership before restart/);
   assert.match(source, /Browser ownership changed or became unreachable; no containers changed/);
   assert.match(source, /Cannot confirm STOPPED handoff; no containers changed/);
-  assert.ok(source.includes('{"state":"STOPPED"}'));
+  assert.ok(source.includes('/maintenance/lock'));
+  assert.match(source, /\\$freeze\\.maintenanceLocked/);
   assert.ok(source.indexOf('$freeze.mode -ne "STOPPED"') < source.indexOf('stop -t 30 browser-worker'));
 
   assert.match(source, /\$current\.mode -ne "STOPPED"/);
@@ -83,4 +84,13 @@ test("Windows browser restart is scoped, preserves volumes and waits for STOPPED
   assert.match(source, /BROWSER_CI_TRUSTED_SMOKE/);
   assert.doesNotMatch(source, /^\s*(?:Remove-Item|rm|rmdir|del)\b/im);
   for (const line of commands) assert.doesNotMatch(line, /\bdown\b|\brm\b|\bprune\b|--volumes|\s-v\b/i);
+});
+
+test("browser maintenance lock prevents handoff and fails closed until worker restart", () => {
+  const worker = read("browser-worker/src/server.mjs");
+  assert.match(worker, /maintenanceLocked && target !== "STOPPED"/);
+  assert.match(worker, /pathname === "\/maintenance\/lock"/);
+  assert.match(worker, /mode !== "STOPPED"/);
+  assert.match(worker, /maintenanceLocked = true/);
+  assert.doesNotMatch(worker, /pathname === "\/maintenance\/unlock"/);
 });
