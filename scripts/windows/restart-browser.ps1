@@ -31,6 +31,17 @@ if($env:BROWSER_CI_TRUSTED_SMOKE -eq "true" -or (Read-EnvValue $envPath "BROWSER
 if($LASTEXITCODE -ne 0) { throw "Docker Engine is not running; no changes made." }
 $dockerOs = (& docker info --format "{{.OSType}}" 2>$null | Out-String).Trim()
 if($LASTEXITCODE -ne 0 -or $dockerOs -ne "linux") { throw "Docker must use Linux containers; no changes made." }
+# Require the named project service to be running before trusting localhost health.
+# An unrelated service bound to port 4300 must never authorize maintenance.
+Push-Location $root
+try {
+  $initialServices = @(& docker compose -f "compose.browser.yml" ps --status running --services 2>$null)
+  if($LASTEXITCODE -ne 0 -or -not ($initialServices -contains "browser-worker")) {
+    throw "Managed browser service is not running; no containers changed."
+  }
+} finally {
+  Pop-Location
+}
 # Refuse to interrupt a live owner/agent handoff. An unavailable worker is
 # not evidence of an idle browser, so recovery must be handled separately.
 try {
