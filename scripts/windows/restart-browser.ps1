@@ -82,6 +82,12 @@ try {
   if(-not $ready) {
     throw "Browser did not return to STOPPED/read-only readiness. Do not disable Chromium sandbox or use real accounts."
   }
+  # A successful health probe must also belong to the managed Docker service.
+  # Do not report success if another local process answered on port 4300.
+  $runningServices = @(& docker compose -f "compose.browser.yml" ps --status running --services 2>$null)
+  if($LASTEXITCODE -ne 0 -or -not ($runningServices -contains "browser-worker")) {
+    throw "Browser compose service is not running; restart cannot be certified."
+  }
   Write-Host "[OK] Browser restarted in STOPPED mode. Database and persisted profile were not replaced." -ForegroundColor Green
   Write-Host "Agent remains inactive; regain manual control from the trusted local UI."
 } finally {
