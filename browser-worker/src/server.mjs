@@ -100,7 +100,7 @@ async function tabStates() {
 
 function browserHealth() {
   return {
-    ready: Boolean(context), mode, viewOnly: mode !== "MANUAL",
+    ready: Boolean(context), mode, viewOnly: mode !== "MANUAL", maintenanceLocked,
     tabs: context ? pages().length : 0,
     agentRunnerReady: enableReadOnlyAgent && Boolean(context) && !trustedCiSmoke,
     // A disposable dummy cookie is exposed as a boolean ONLY to explicitly opted-in offline CI.
