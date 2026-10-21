@@ -67,6 +67,8 @@ test("Windows browser restart is scoped, preserves volumes and waits for STOPPED
   assert.match(commands[2], /-f "compose\.browser\.yml" up -d --no-deps browser-worker/);
   assert.match(source, /\$health\.mode -eq "STOPPED"/);
   assert.match(source, /\$health\.viewOnly/);
+  assert.ok(source.includes("$health.maintenanceLocked -eq $false"));
+  assert.ok(source.includes("$freeze.maintenanceLocked -ne $true"));
   assert.match(source, /\$before\.viewOnly/);
   assert.match(source, /\$before\.mode -ne "STOPPED"/);
   assert.match(source, /Cannot verify browser ownership before restart/);
