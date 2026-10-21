@@ -61,11 +61,12 @@ test("Windows stop script only stops named containers and preserves volumes", ()
 test("Windows browser restart is scoped, preserves volumes and waits for STOPPED", () => {
   const source = read("scripts/windows/restart-browser.ps1");
   const commands = source.split("\n").filter((line) => /(?:^\s*& docker compose\b|@\(& docker compose\b)/.test(line));
-  assert.equal(commands.length, 4);
-  assert.match(commands[0], /compose\.browser\.yml" config --quiet/);
-  assert.match(commands[1], /-f "compose\.browser\.yml" stop(?: -t 30)? browser-worker/);
-  assert.match(commands[2], /-f "compose\.browser\.yml" up -d --no-deps browser-worker/);
-  assert.match(commands[3], /-f "compose\.browser\.yml" ps --status running --services/);
+  assert.equal(commands.length, 5);
+  assert.match(commands[0], /compose\.browser\.yml" ps --status running --services/);
+  assert.match(commands[1], /compose\.browser\.yml" config --quiet/);
+  assert.match(commands[2], /-f "compose\.browser\.yml" stop(?: -t 30)? browser-worker/);
+  assert.match(commands[3], /-f "compose\.browser\.yml" up -d --no-deps browser-worker/);
+  assert.match(commands[4], /-f "compose\.browser\.yml" ps --status running --services/);
   assert.match(source, /\$health\.mode -eq "STOPPED"/);
   assert.match(source, /\$health\.viewOnly/);
   assert.ok(source.includes("$health.maintenanceLocked -eq $false"));
