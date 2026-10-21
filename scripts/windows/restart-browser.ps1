@@ -64,7 +64,7 @@ try {
   } catch {
     throw "Cannot confirm STOPPED handoff; no containers changed."
   }
-  if($freeze.mode -ne "STOPPED" -or -not $freeze.viewOnly -or -not $freeze.maintenanceLocked) {
+  if($freeze.mode -ne "STOPPED" -or -not $freeze.viewOnly -or $freeze.maintenanceLocked -ne $true) {
     throw "STOPPED handoff failed; no containers changed."
   }
   & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
@@ -75,7 +75,7 @@ try {
   for($i=0; $i -lt 30; $i++) {
     try {
       $health = Invoke-RestMethod -Uri "http://127.0.0.1:4300/health" -Headers @{Authorization=("Bearer "+$token)} -TimeoutSec 4
-      if($health.ready -and $health.novnc -and $health.viewOnly -and $health.mode -eq "STOPPED") { $ready = $true; break }
+      if($health.ready -and $health.novnc -and $health.viewOnly -and $health.mode -eq "STOPPED" -and $health.maintenanceLocked -eq $false) { $ready = $true; break }
     } catch {}
     Start-Sleep -Seconds 2
   }
