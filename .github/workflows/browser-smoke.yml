@@ -257,7 +257,7 @@ jobs:
           ready=0
           for i in $(seq 1 40); do
             if curl -fsS --max-time 4 -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-maintenance-recovered.json 2>/dev/null; then
-              if node -e 'const h=require("/tmp/paw-maintenance-recovered.json");process.exit(h.mode==="STOPPED" && h.viewOnly && h.ready && h.novnc && h.ciProfileRecovered===true ? 0 : 1)'; then ready=1; break; fi
+              if node -e 'const h=require("/tmp/paw-maintenance-recovered.json");process.exit(h.mode==="STOPPED" && h.viewOnly && h.maintenanceLocked===false && h.ready && h.novnc && h.ciProfileRecovered===true ? 0 : 1)'; then ready=1; break; fi
             fi
             sleep 2
           done
