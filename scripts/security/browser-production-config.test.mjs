@@ -67,6 +67,10 @@ test("Windows browser restart is scoped, preserves volumes and waits for STOPPED
   assert.match(commands[2], /-f "compose\.browser\.yml" stop(?: -t 30)? browser-worker/);
   assert.match(commands[3], /-f "compose\.browser\.yml" up -d --no-deps browser-worker/);
   assert.match(commands[4], /-f "compose\.browser\.yml" ps --status running --services/);
+  assert.ok(source.includes('$initialServices -contains "browser-worker"'));
+  assert.ok(source.indexOf('$initialServices =') < source.indexOf('$before = Invoke-RestMethod'));
+  assert.ok(source.indexOf('$initialServices =') < source.indexOf('/maintenance/lock'));
+
   assert.match(source, /\$health\.mode -eq "STOPPED"/);
   assert.match(source, /\$health\.viewOnly/);
   assert.ok(source.includes("$health.maintenanceLocked -eq $false"));
