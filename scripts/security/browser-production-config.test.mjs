@@ -61,13 +61,16 @@ test("Windows stop script only stops named containers and preserves volumes", ()
 test("Windows browser restart is scoped, preserves volumes and waits for STOPPED", () => {
   const source = read("scripts/windows/restart-browser.ps1");
   const commands = source.split("\n").filter((line) => /(?:^\s*& docker compose\b|@\(& docker compose\b)/.test(line));
-  assert.equal(commands.length, 5);
+  assert.equal(commands.length, 6);
   assert.match(commands[0], /compose\.browser\.yml" ps --status running --services/);
   assert.match(commands[1], /compose\.browser\.yml" config --quiet/);
-  assert.match(commands[2], /-f "compose\.browser\.yml" stop(?: -t 30)? browser-worker/);
-  assert.match(commands[3], /-f "compose\.browser\.yml" up -d --no-deps browser-worker/);
-  assert.match(commands[4], /-f "compose\.browser\.yml" ps --status running --services/);
+  assert.match(commands[2], /compose\.browser\.yml" ps --status running --services/);
+  assert.match(commands[3], /-f "compose\.browser\.yml" stop(?: -t 30)? browser-worker/);
+  assert.match(commands[4], /-f "compose\.browser\.yml" up -d --no-deps browser-worker/);
+  assert.match(commands[5], /-f "compose\.browser\.yml" ps --status running --services/);
   assert.ok(source.includes('$initialServices -contains "browser-worker"'));
+  assert.ok(source.includes('$lockedServices -contains "browser-worker"'));
+  assert.ok(source.indexOf('$lockedServices =') < source.indexOf('stop -t 30 browser-worker'));
   assert.ok(source.indexOf('$initialServices =') < source.indexOf('$before = Invoke-RestMethod'));
   assert.ok(source.indexOf('$initialServices =') < source.indexOf('/maintenance/lock'));
 
