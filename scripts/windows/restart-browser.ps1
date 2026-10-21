@@ -88,6 +88,17 @@ try {
   if($LASTEXITCODE -ne 0 -or -not ($runningServices -contains "browser-worker")) {
     throw "Browser compose service is not running; restart cannot be certified."
   }
+  # A last authenticated health read after verifying Docker service state
+  # guards against stale readiness while the service was being inspected.
+  try {
+    $finalHealth = Invoke-RestMethod -Uri "http://127.0.0.1:4300/health" -Headers @{Authorization=("Bearer "+$token)} -TimeoutSec 5
+  } catch {
+    throw "Browser health became unreachable after Docker verification; restart cannot be certified."
+  }
+  if(-not $finalHealth.ready -or -not $finalHealth.novnc -or -not $finalHealth.viewOnly -or
+      $finalHealth.mode -ne "STOPPED" -or $finalHealth.maintenanceLocked -ne $false) {
+    throw "Browser health changed after Docker verification; restart cannot be certified."
+  }
   Write-Host "[OK] Browser restarted in STOPPED mode. Database and persisted profile were not replaced." -ForegroundColor Green
   Write-Host "Agent remains inactive; regain manual control from the trusted local UI."
 } finally {
