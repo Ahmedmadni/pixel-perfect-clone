@@ -49,7 +49,7 @@ try {
 } catch {
   throw "Cannot verify browser ownership before restart; no containers changed."
 }
-if(-not $before.ready -or -not $before.novnc -or -not $before.viewOnly -or $before.mode -ne "STOPPED") {
+if(-not $before.ready -or -not $before.novnc -or -not $before.viewOnly -or $before.mode -ne "STOPPED" -or $before.maintenanceLocked -ne $false) {
   throw "Browser must already be STOPPED before maintenance restart. Stop the active task through the trusted local UI first."
 }
 $composePath = Join-Path $root "compose.browser.yml"
@@ -65,7 +65,7 @@ try {
   } catch {
     throw "Browser ownership changed or became unreachable; no containers changed."
   }
-  if(-not $current.ready -or -not $current.novnc -or -not $current.viewOnly -or $current.mode -ne "STOPPED") {
+  if(-not $current.ready -or -not $current.novnc -or -not $current.viewOnly -or $current.mode -ne "STOPPED" -or $current.maintenanceLocked -ne $false) {
     throw "Browser is no longer STOPPED/view-only; no containers changed."
   }
   # Ask the worker to stay STOPPED; a status probe alone is not a lock.
