@@ -78,6 +78,11 @@ try {
   if($freeze.mode -ne "STOPPED" -or -not $freeze.viewOnly -or $freeze.maintenanceLocked -ne $true) {
     throw "STOPPED handoff failed; no containers changed."
   }
+  # Verify that the same managed service still exists after the lock is acquired.
+  $lockedServices = @(& docker compose -f "compose.browser.yml" ps --status running --services 2>$null)
+  if($LASTEXITCODE -ne 0 -or -not ($lockedServices -contains "browser-worker")) {
+    throw "Managed browser service disappeared after maintenance lock; no stop attempted."
+  }
   & docker compose -f "compose.browser.yml" stop -t 30 browser-worker
   if($LASTEXITCODE -ne 0) { throw "Browser stop failed; startup was not attempted." }
   & docker compose -f "compose.browser.yml" up -d --no-deps browser-worker
