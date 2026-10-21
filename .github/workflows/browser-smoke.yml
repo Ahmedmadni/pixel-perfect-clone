@@ -238,6 +238,9 @@ jobs:
           curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
             -d '{}' http://127.0.0.1:4300/maintenance/lock > /tmp/paw-maintenance-lock.json
           node -e 'const h=require("/tmp/paw-maintenance-lock.json");process.exit(h.maintenanceLocked && h.mode==="STOPPED" && h.viewOnly ? 0 : 1)'
+          curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{}' http://127.0.0.1:4300/maintenance/lock > /tmp/paw-maintenance-lock-again.json
+          node -e 'const h=require("/tmp/paw-maintenance-lock-again.json");process.exit(h.maintenanceLocked && h.mode==="STOPPED" && h.viewOnly ? 0 : 1)'
           status="$(curl -sS -o /tmp/paw-maintenance-denied.json -w '%{http_code}' -X POST \
             -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
             -d '{"state":"MANUAL"}' http://127.0.0.1:4300/control)"
