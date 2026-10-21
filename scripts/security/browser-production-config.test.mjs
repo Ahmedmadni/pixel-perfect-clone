@@ -71,6 +71,10 @@ test("Windows browser restart is scoped, preserves volumes and waits for STOPPED
   assert.ok(source.includes("$health.maintenanceLocked -eq $false"));
   assert.ok(source.includes('ps --status running --services'));
   assert.ok(source.includes('$runningServices -contains "browser-worker"'));
+  assert.ok(source.includes('$finalHealth.maintenanceLocked -ne $false'));
+  assert.ok(source.includes('$finalHealth.mode -ne "STOPPED"'));
+  assert.ok(source.indexOf('ps --status running --services') < source.indexOf('$finalHealth = Invoke-RestMethod'));
+  assert.ok(source.indexOf('$finalHealth.mode -ne "STOPPED"') < source.indexOf('Write-Host "[OK] Browser restarted'));
   assert.ok(source.indexOf('ps --status running --services') < source.indexOf('Write-Host "[OK] Browser restarted'));
 
   assert.ok(source.includes("$freeze.maintenanceLocked -ne $true"));
