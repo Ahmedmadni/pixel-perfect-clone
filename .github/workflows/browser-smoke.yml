@@ -218,6 +218,21 @@ jobs:
           node -e 'const t=require("/tmp/paw-tabs-after-db.json");if(!Array.isArray(t)||t.length<1)process.exit(1)'
           echo "PASS: database health recovers without granting agent control"
 
+      - name: Refuse maintenance lock during manual ownership
+        run: |
+          curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{"state":"MANUAL"}' http://127.0.0.1:4300/control > /tmp/paw-maint-manual.json
+          node -e 'const h=require("/tmp/paw-maint-manual.json");process.exit(h.mode==="MANUAL" && h.viewOnly===false?0:1)'
+          code="$(curl -sS -o /tmp/paw-maint-refused.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{}' http://127.0.0.1:4300/maintenance/lock)"
+          test "$code" = "409"
+          node -e 'const h=require("/tmp/paw-maint-refused.json");process.exit(h.error==="maintenance_requires_stopped"?0:1)'
+          curl -fsS -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" http://127.0.0.1:4300/health > /tmp/paw-maint-still-manual.json
+          node -e 'const h=require("/tmp/paw-maint-still-manual.json");process.exit(h.mode==="MANUAL" && h.viewOnly===false?0:1)'
+          curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
+            -d '{"state":"STOPPED"}' http://127.0.0.1:4300/control > /tmp/paw-maint-stopped.json
+          node -e 'const h=require("/tmp/paw-maint-stopped.json");process.exit(h.mode==="STOPPED" && h.viewOnly===true?0:1)'
       - name: Maintenance lock rejects handoff until fresh worker restart
         run: |
           curl -fsS -X POST -H "Authorization: Bearer $BROWSER_WORKER_TOKEN" -H "Content-Type: application/json" \
