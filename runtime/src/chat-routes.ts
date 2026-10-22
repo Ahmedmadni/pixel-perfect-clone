@@ -18,7 +18,14 @@ const historyQuery = z.object({
 const cancelSchema = z.object({ conversationId: conversationIdSchema }).strict();
 
 function describe(e: unknown): string {
-  if (e instanceof OllamaError) return e.message.slice(0,200);
+  if (e instanceof OllamaError) {
+    const messages = {
+      offline: "Local Ollama is unreachable", timeout: "Local Ollama timed out",
+      http: "Local Ollama returned an HTTP error", bad_response: "Local Ollama returned an invalid response",
+      model_error: "Local Ollama model generation failed",
+    };
+    return messages[e.kind];
+  }
   return "Chat generation or persistence failed";
 }
 
@@ -117,6 +124,7 @@ export function registerChatRoutes(app: FastifyInstance, ollama?: OllamaClient, 
         ];
         for await (const delta of ollama.chatStream(model, messages, controller.signal)) {
           controller.signal.throwIfAborted();
+          if (answer.length + delta.length > 1_000_000) throw new OllamaError("Answer too long", "bad_response");
           answer += delta;
           send({ type: "delta", text: delta });
         }

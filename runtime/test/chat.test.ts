@@ -42,7 +42,8 @@ function history(): ChatStore {
     addUser: async (_conv, content) => add("user", content, "complete"),
     startAssistant: async (_conv, model) => add("assistant", "", "streaming", model),
     finishAssistant: async (id, content, status, error) => {
-      const msg = messages.find((m) => m.id === id)!;
+      const msg = messages.find((m) => m.id === id);
+      if (!msg) throw new Error("Missing assistant message");
       msg.content = content;
       msg.status = status;
       msg.error = error ?? null;
