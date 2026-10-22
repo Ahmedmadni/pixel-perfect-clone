@@ -34,6 +34,7 @@ export async function* parseNdjson(body: AsyncIterable<Uint8Array>): AsyncGenera
     while ((nl = buf.indexOf("\n")) >= 0) {
       const line = buf.slice(0, nl).trim();
       buf = buf.slice(nl + 1);
+      if (line.length > 1_000_000) throw new OllamaError("Ollama line too long", "bad_response");
       if (!line) continue;
       try {
         yield JSON.parse(line);
@@ -59,6 +60,7 @@ function linkSignals(timeoutMs: number, outer?: AbortSignal) {
   const t = setTimeout(() => ctrl.abort(new OllamaError("Ollama timed out", "timeout")), timeoutMs);
   const onAbort = () => ctrl.abort(outer?.reason);
   outer?.addEventListener("abort", onAbort, { once: true });
+  if (outer?.aborted) onAbort();
   return {
     signal: ctrl.signal,
     clear: () => {
@@ -87,12 +89,12 @@ export class OllamaClient {
   async listModels(signal?: AbortSignal): Promise<OllamaModel[]> {
     const l = linkSignals(this.opts.tagsTimeoutMs ?? 2500, signal);
     try {
-      const res = await fetch(new URL("/api/tags", this.baseUrl), { signal: l.signal });
+      const res = await fetch(new URL("/api/tags", this.baseUrl), { signal: l.signal, redirect: "error" });
       if (!res.ok) throw new OllamaError(`Ollama /api/tags HTTP ${res.status}`, "http");
       const j = (await res.json()) as { models?: unknown };
       if (!Array.isArray(j.models)) throw new OllamaError("Unexpected /api/tags response", "bad_response");
       return j.models
-        .filter((m): m is Record<string, unknown> => !!m && typeof (m as { name?: unknown }).name === "string")
+        .filter((m): m is Record<string, unknown> => !!m && typeof (m as { name?: unknown }).name === "string" && Boolean((m as { name: string }).name.trim()))
         .map((m) => {
           const d = (m["details"] ?? {}) as Record<string, unknown>;
           return {
@@ -122,6 +124,7 @@ export class OllamaClient {
     };
     const onTotal = () => ctrl.abort(total.signal.reason);
     total.signal.addEventListener("abort", onTotal, { once: true });
+    if (total.signal.aborted) onTotal();
     try {
       arm();
       let res: Response;
@@ -131,6 +134,7 @@ export class OllamaClient {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ model, messages, stream: true }),
           signal: ctrl.signal,
+          redirect: "error",
         });
       } catch (e) {
         mapFetchError(e, ctrl.signal);

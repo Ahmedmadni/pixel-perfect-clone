@@ -18,3 +18,4 @@
 - Development source-of-truth is GitHub main. Never rebase/squash/force-push Lovable-linked history.
 - Arabic RTL first, responsive mobile. Preserve setup for Windows and loopback-only secrets; do not disable Chromium sandbox for real accounts.
 - Actual Windows + real Ollama inference remains unverified until run on the user's machine. Document limitations in `docs/CURRENT_STATUS.md` rather than showing dummy work.
+- Ollama/chat HTTP endpoints belong to the separate loopback Fastify runtime, not hosted server functions; reserve each conversation before asynchronous preparation and release it only after stream persistence settles to prevent overlapping generation.

@@ -96,7 +96,7 @@ export async function buildApp(
     try {
       await store.ping();
     } catch (e) {
-      pg = { name: "postgres", status: "down", detail: (e as Error).message.slice(0, 200) };
+      pg = { name: "postgres", status: "down", detail: "local PostgreSQL probe failed" };
     }
     const notProbed = "not probed: integration not yet implemented";
     let installedModelCount = 0;
@@ -117,7 +117,7 @@ export async function buildApp(
     }
     return {
       version: VERSION,
-      degraded: pg.status !== "up" || ollamaHealth.status === "down" ||
+      degraded: pg.status !== "up" || ollamaHealth.status !== "up" || installedModelCount === 0 ||
         (Boolean(dependencies?.browser) && (!browserHealth?.ready || !browserHealth.novnc)),
       services: [
         { name: "api", status: "up" },
@@ -393,6 +393,6 @@ export async function buildApp(
     return store.logs(q.data.limit);
   });
 
-  if (dependencies?.ollama && dependencies.chat) registerChatRoutes(app, dependencies.ollama, dependencies.chat, dependencies.knowledge);
+  registerChatRoutes(app, dependencies?.ollama, dependencies?.chat, dependencies?.knowledge);
   return app;
 }
