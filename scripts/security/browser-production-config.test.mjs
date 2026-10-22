@@ -58,6 +58,17 @@ test("Windows stop script only stops named containers and preserves volumes", ()
   assert.doesNotMatch(source, /^\s*(?:Remove-Item|rm|rmdir|del)\b/im);
 });
 
+test("Windows diagnostics verify maintenance lock consistency without printing secrets", async () => {
+  const source = await readFile(new URL("../windows/diagnose.ps1", import.meta.url), "utf8");
+  assert.ok(source.includes('"Maintenance lock safety"'));
+  assert.ok(source.includes('$h.mode -eq "STOPPED" -and [bool]$h.viewOnly'));
+  assert.ok(source.includes('"Maintenance lock status"'));
+  assert.ok(source.includes('does not expose maintenanceLocked'));
+  assert.ok(source.includes('No account content, session cookies, access tokens, or private backup data were printed.'));
+  assert.ok(!source.includes('$h.cookies'));
+  assert.ok(!source.includes('$h.token'));
+});
+
 test("Windows browser restart is scoped, preserves volumes and waits for STOPPED", () => {
   const source = read("scripts/windows/restart-browser.ps1");
   const commands = source.split("\n").filter((line) => /(?:^\s*& docker compose\b|@\(& docker compose\b)/.test(line));
