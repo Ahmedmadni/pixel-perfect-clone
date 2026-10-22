@@ -59,7 +59,7 @@ test("Windows stop script only stops named containers and preserves volumes", ()
 });
 
 test("Windows diagnostics verify maintenance lock consistency without printing secrets", async () => {
-  const source = await readFile(new URL("../windows/diagnose.ps1", import.meta.url), "utf8");
+  const source = read("scripts/windows/diagnose.ps1");
   assert.ok(source.includes('"Maintenance lock safety"'));
   assert.ok(source.includes('$h.mode -eq "STOPPED" -and [bool]$h.viewOnly'));
   assert.ok(source.includes('"Maintenance lock status"'));
