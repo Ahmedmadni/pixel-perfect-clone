@@ -76,6 +76,17 @@ if($workerToken.Length -ge 32) {
     Check "noVNC socket" ([bool]$h.novnc) "local WebSocket listener"
     Write-Host ("Browser owner mode: "+$h.mode)
     Write-Host ("Browser tabs: "+$h.tabs)
+    if ($null -ne $h.maintenanceLocked) {
+      $lockConsistent = -not [bool]$h.maintenanceLocked -or ($h.mode -eq "STOPPED" -and [bool]$h.viewOnly)
+      Check "Maintenance lock safety" $lockConsistent "locked worker must remain STOPPED and view-only"
+      if ([bool]$h.maintenanceLocked) {
+        Write-Host "Maintenance lock: active (restart only after the current maintenance operation completes)"
+      } else {
+        Write-Host "Maintenance lock: inactive"
+      }
+    } else {
+      Check "Maintenance lock status" $false "worker health response does not expose maintenanceLocked"
+    }
   } catch {
     Check "Browser worker" $false "local worker is offline or not authenticated"
   }
