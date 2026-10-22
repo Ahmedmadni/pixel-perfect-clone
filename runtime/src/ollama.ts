@@ -59,6 +59,7 @@ function linkSignals(timeoutMs: number, outer?: AbortSignal) {
   const t = setTimeout(() => ctrl.abort(new OllamaError("Ollama timed out", "timeout")), timeoutMs);
   const onAbort = () => ctrl.abort(outer?.reason);
   outer?.addEventListener("abort", onAbort, { once: true });
+  if (outer?.aborted) onAbort();
   return {
     signal: ctrl.signal,
     clear: () => {
@@ -92,7 +93,7 @@ export class OllamaClient {
       const j = (await res.json()) as { models?: unknown };
       if (!Array.isArray(j.models)) throw new OllamaError("Unexpected /api/tags response", "bad_response");
       return j.models
-        .filter((m): m is Record<string, unknown> => !!m && typeof (m as { name?: unknown }).name === "string")
+        .filter((m): m is Record<string, unknown> => !!m && typeof (m as { name?: unknown }).name === "string" && Boolean((m as { name: string }).name.trim()))
         .map((m) => {
           const d = (m["details"] ?? {}) as Record<string, unknown>;
           return {
@@ -122,6 +123,7 @@ export class OllamaClient {
     };
     const onTotal = () => ctrl.abort(total.signal.reason);
     total.signal.addEventListener("abort", onTotal, { once: true });
+    if (total.signal.aborted) onTotal();
     try {
       arm();
       let res: Response;

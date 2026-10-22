@@ -24,6 +24,11 @@ const toMsg = (r: Row): ChatMessage => ({
   model: r.model, error: r.error, at: r.created_at.toISOString(),
 });
 const COLS = "id, seq::text, role, content, status, model, error, created_at";
+function firstRow(rows: Row[]): Row {
+  const row = rows[0];
+  if (!row) throw new Error("Chat write returned no row");
+  return row;
+}
 
 export class PgChatStore implements ChatStore {
   constructor(private pool: Pool) {}
@@ -43,7 +48,8 @@ export class PgChatStore implements ChatStore {
       );
       const more = r.rows.length > limit;
       const rows = r.rows.slice(0, limit);
-      return { messages: rows.reverse().map(toMsg), nextBefore: more ? Number(rows[0]!.seq) : null };
+      const messages = rows.reverse().map(toMsg);
+      return { messages, nextBefore: more ? messages[0]?.seq ?? null : null };
     });
   }
   context(conv: string, limit: number) {
@@ -62,7 +68,7 @@ export class PgChatStore implements ChatStore {
         `INSERT INTO chat_messages (id, conversation_id, role, content, status) VALUES ($1,$2,'user',$3,'complete') RETURNING ${COLS}`,
         [randomUUID(), conv, content],
       );
-      return toMsg(r.rows[0]!);
+      return toMsg(firstRow(r.rows));
     });
   }
   startAssistant(conv: string, model: string) {
@@ -71,7 +77,7 @@ export class PgChatStore implements ChatStore {
         `INSERT INTO chat_messages (id, conversation_id, role, content, status, model) VALUES ($1,$2,'assistant','','streaming',$3) RETURNING ${COLS}`,
         [randomUUID(), conv, model],
       );
-      return toMsg(r.rows[0]!);
+      return toMsg(firstRow(r.rows));
     });
   }
   finishAssistant(id: string, content: string, status: Exclude<ChatMessageStatus, "streaming">, error?: string) {
@@ -80,7 +86,7 @@ export class PgChatStore implements ChatStore {
         `UPDATE chat_messages SET content=$2, status=$3, error=$4, updated_at=now() WHERE id=$1 RETURNING ${COLS}`,
         [id, content, status, error ?? null],
       );
-      return toMsg(r.rows[0]!);
+      return toMsg(firstRow(r.rows));
     });
   }
   recover() {
