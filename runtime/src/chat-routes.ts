@@ -81,7 +81,12 @@ export function registerChatRoutes(app: FastifyInstance, ollama?: OllamaClient, 
       disconnected = true;
       controller.abort(new Error("Client disconnected"));
     };
+    // A disconnected HTTP client may close the underlying socket before Fastify's
+    // response lifecycle emits "close" (notably after hijacking for NDJSON).
+    // Observe both signals so an upstream Ollama generation is cancelled promptly.
+    const clientSocket = request.raw.socket;
     reply.raw.once("close", onClose);
+    clientSocket.once("close", onClose);
     try {
       // Reserve before discovery: concurrent requests cannot both pass preparation.
       let models;
@@ -141,6 +146,7 @@ export function registerChatRoutes(app: FastifyInstance, ollama?: OllamaClient, 
       if (!reply.raw.destroyed) reply.raw.end();
     } finally {
       reply.raw.removeListener("close", onClose);
+      clientSocket.removeListener("close", onClose);
       // If a failure happened before attaching the stream, the error handler responds normally.
       if (assistantId && !completed && !reply.sent) {
         await chat.finishAssistant(assistantId, answer, controller.signal.aborted ? "aborted" : "failed", "Interrupted before streaming")
