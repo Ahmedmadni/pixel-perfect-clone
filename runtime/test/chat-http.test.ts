@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { createServer, type Server } from "node:http";
+import { createServer, request as httpRequest, type Server } from "node:http";
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import { buildApp } from "../src/app.ts";
@@ -165,13 +165,22 @@ describe("Ollama HTTP endpoints and exclusive cancellable chat", () => {
     const h = history();
     const app = await runtime(new OllamaClient(f.url), h.chat);
     const url = await app.listen({ port: 0, host: "127.0.0.1" });
-    const controller = new AbortController();
-    const response = await fetch(url + "/v1/chat/stream", { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal });
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("Missing response body");
-    await reader.read();
+    const firstChunk = deferred<void>();
+    const client = httpRequest(url + "/v1/chat/stream", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
+    client.on("response", (response) => {
+      response.once("data", () => firstChunk.resolve());
+      response.on("error", () => {});
+    });
+    // Destroy the actual TCP client socket; AbortController on fetch can leave
+    // undici's pooled connection open while the test's upstream is held forever.
+    client.on("error", () => {});
+    client.end(JSON.stringify(payload));
+    await firstChunk.promise;
     await f.chatEntered.promise;
-    controller.abort();
+    client.destroy();
     await f.chatClosed.promise;
     await new Promise<void>((resolve, reject) => {
       let attempts = 0;
