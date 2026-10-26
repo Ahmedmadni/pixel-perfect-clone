@@ -178,3 +178,12 @@ PostgreSQL، ومنع تسليم التحكم للوكيل دون بدء مهم�
 - نتيجة التشغيل: `success`، واكتملت المهام التسع بنجاح؛ شملت بناء الواجهة واختباراتها، TypeScript، runtime، تكامل PostgreSQL، وفحوص Windows وChromium والنسخ الاحتياطي.
 - هذا التشغيل يؤكد نتيجة CI لهذا الـ commit فقط. لا يثبت تشغيل Docker Desktop أو Chromium الفعلي أو Ollama بنموذج محلي على جهاز المالك.
 - تظل بوابات القبول المحلية W0–W5 بحالة `NOT TESTED` حتى تنفيذها على جهاز Windows وتسجيل أدلة منقحة. الخطوة العملية التالية هي `scripts/windows/launch.ps1` لأول إعداد نظيف، أو `scripts/windows/preflight.ps1` إذا كانت الإعدادات المحلية موجودة بالفعل. لا تشارك ملفات الأسرار ولا تعطّل Chromium sandbox.
+
+
+### تحقق CI بعد تحديث تقرير الحالة — 26 أكتوبر 2026
+
+- اكتمل تشغيل **Verify Cloud Development #320** بنتيجة **success** على commit `35fc2f333e3f870c51355bd06fa997d9b392a8d5`: https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/40282383414
+- نجحت جميع **9/9** مهام، بما فيها فحوص PowerShell وDocker Compose، وتكامل PostgreSQL، واختبارات أمان Windows، والنسخ الاحتياطي المشفر والاستعادة غير المتلفة، وسياسة Chromium، وبناء واختبارات الواجهة العربية، واختبارات بدء التشغيل والنسخ الاحتياطي باستخدام DPAPI.
+- لا توجد artifacts منشورة لهذا التشغيل.
+- **القرار:** اعتماد التحقق السحابي لهذا الـ commit ناجح. لا يتغير وضع بوابات W0–W5 المحلية: ما زالت **NOT TESTED** على جهاز المستخدم؛ ولا تُعد نتيجة CI إثباتًا لتشغيل Ollama بنموذج حقيقي أو حفظ جلسة Chromium الشخصية واستعادتها على Windows.
+- الخطوة التالية العملية: تشغيل `.scripts\windows\preflight.ps1` إذا كان إعداد محلي موجودًا، أو `.scripts\windows\launch.ps1` للإعداد الأولي، ثم `.scripts\windows\diagnose.ps1 -Strict -TestInference` بعد تشغيل الخدمات وتثبيت نموذج Ollama. احتفظ بملفات `.env` وبيانات المتصفح محليًا ولا ترفعها.
