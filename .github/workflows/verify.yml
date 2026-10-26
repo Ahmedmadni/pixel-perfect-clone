@@ -108,6 +108,37 @@ jobs:
       - name: Execute real database and other runtime tests sequentially
         run: npm test -- --maxWorkers=1 --minWorkers=1
   
+  windows-native-powershell:
+    name: Native Windows PowerShell safety checks
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows scripts on a native Windows runner
+        shell: pwsh
+        run: |
+          $paths = @("scripts/windows/launch.ps1", "scripts/windows/setup.ps1", "scripts/windows/start.ps1", "scripts/windows/diagnose.ps1", "scripts/windows/backup.ps1", "scripts/windows/restore.ps1", "scripts/windows/scheduled-backup.ps1", "scripts/windows/browser-profile.ps1", "scripts/windows/preflight.ps1", "scripts/windows/test-preflight.ps1", "scripts/windows/test-diagnose.ps1", "scripts/windows/stop.ps1", "scripts/windows/restart-browser.ps1")
+          foreach ($path in $paths) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path).Path,
+              [ref]$tokens,
+              [ref]$parseErrors
+            ) | Out-Null
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              throw "Invalid PowerShell syntax: $path"
+            }
+            Write-Host "Valid native Windows syntax: $path"
+          }
+      - name: Run isolated Windows preflight regression tests
+        shell: pwsh
+        run: ./scripts/windows/test-preflight.ps1
+      - name: Run secret-safe strict diagnostics regression tests
+        shell: pwsh
+        run: ./scripts/windows/test-diagnose.ps1
+
   windows-script-static:
     name: Windows PowerShell and Docker Compose syntax
     runs-on: ubuntu-latest
