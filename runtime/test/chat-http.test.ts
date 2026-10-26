@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { createServer, type Server } from "node:http";
+import { createServer, request as httpRequest, type Server } from "node:http";
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import { buildApp } from "../src/app.ts";
@@ -57,7 +57,10 @@ async function bind(server: Server) {
 }
 async function runtime(ollama?: OllamaClient, chat?: ChatStore, store = control) {
   const app = await buildApp(cfg, store, { ollama, chat });
-  cleanups.push(() => app.close());
+  cleanups.push(async () => {
+    app.server.closeAllConnections();
+    await app.close();
+  });
   return app;
 }
 async function fixture(options: { empty?: boolean; holdTags?: boolean; holdChat?: boolean; badChat?: boolean } = {}) {
@@ -145,6 +148,36 @@ describe("Ollama HTTP endpoints and exclusive cancellable chat", () => {
     expect((await first).statusCode).toBe(200);
     expect((await stream(app)).statusCode).toBe(200);
   });
+  it("releases the conversation lock when the client disconnects during model discovery", async () => {
+    const f = await fixture({ holdTags: true });
+    const h = history();
+    const app = await runtime(new OllamaClient(f.url), h.chat);
+    const clientSocketClosed = deferred<void>();
+    app.server.once("connection", (socket) => socket.once("close", () => clientSocketClosed.resolve()));
+    const url = await app.listen({ port: 0, host: "127.0.0.1" });
+    const client = httpRequest(url + "/v1/chat/stream", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
+    client.on("error", () => {});
+    client.end(JSON.stringify(payload));
+    await f.tagsEntered.promise;
+    client.destroy();
+    await clientSocketClosed.promise;
+    f.releaseTags.resolve();
+
+    // The abandoned request must not persist a user/assistant message or leave
+    // the conversation permanently busy while model discovery is unwinding.
+    let response: Awaited<ReturnType<typeof stream>> | undefined;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      response = await stream(app);
+      if (response.statusCode !== 409) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(response?.statusCode).toBe(200);
+    expect(h.messages).toHaveLength(2);
+    expect(h.messages[1]?.status).toBe("complete");
+  });
   it("cancels upstream generation, stores aborted partial text and releases the lock", async () => {
     const f = await fixture({ holdChat: true });
     const h = history();
@@ -165,13 +198,22 @@ describe("Ollama HTTP endpoints and exclusive cancellable chat", () => {
     const h = history();
     const app = await runtime(new OllamaClient(f.url), h.chat);
     const url = await app.listen({ port: 0, host: "127.0.0.1" });
-    const controller = new AbortController();
-    const response = await fetch(url + "/v1/chat/stream", { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: controller.signal });
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("Missing response body");
-    await reader.read();
+    const firstChunk = deferred<void>();
+    const client = httpRequest(url + "/v1/chat/stream", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
+    client.on("response", (response) => {
+      response.once("data", () => firstChunk.resolve());
+      response.on("error", () => {});
+    });
+    // Destroy the actual TCP client socket; AbortController on fetch can leave
+    // undici's pooled connection open while the test's upstream is held forever.
+    client.on("error", () => {});
+    client.end(JSON.stringify(payload));
+    await firstChunk.promise;
     await f.chatEntered.promise;
-    controller.abort();
+    client.destroy();
     await f.chatClosed.promise;
     await new Promise<void>((resolve, reject) => {
       let attempts = 0;

@@ -12,13 +12,14 @@
 
 | Method | Endpoint | Request | Success response | Failure |
 |---|---|---|---|---|
-| GET | `/v1/health` | — | `HealthResponse` with probed PostgreSQL; unprobed services `unknown` | foreign Origin: 403 |
+| GET | `/v1/health` | — | `HealthResponse` with independently probed PostgreSQL and configured Ollama; intentionally unprobed services `unknown` | foreign Origin: 403 |
 | GET | `/v1/agent/status` | Authorization header | `AgentStatus` including authoritative `snapshot` | 401/403/503 |
 | POST | `/v1/agent/control` | ControlEvent JSON with `type` (see below) | `{ "ok": true, "snapshot": ControlSnapshot }` | 400 bad payload; 409 invalid transition; 503 unavailable |
 | GET | `/v1/logs?limit=100` | Authorization header; limit 1–500 | `ActivityLog[]` | 400/401/403/503 |
 | GET | `/v1/models` | Authorization header | `{models: [{name, size, family, ...}]}` from Ollama `/api/tags` | 503 offline |
 | GET | `/v1/chat/messages?conversationId=default&limit=50` | Authorization header; optional cursor `before` | `{messages: ChatMessage[], nextBefore}` oldest-to-newest page | 400/401/503 |
 | POST | `/v1/chat/stream` | `{content,model,conversationId:"default"}` | `application/x-ndjson` incremental events | 400/409/503; stream `error` event |
+| POST | `/v1/chat/cancel` | `{conversationId:"default"}` | 202 `{ok:true,cancelling:true}` | 400 invalid body; 409 conversation not active; 401/403 |
 
 **IMPORTANT:** The event body uses the key **`type`**, not `event`. Examples:
 
@@ -50,6 +51,16 @@ POST /v1/chat/stream uses a validated *installed* model and streams newline-deli
 ```
 
 On error it emits `{"type":"error","error":"..."}` when the connection remains writable and records the failed/aborted assistant row. Aborting the client's fetch aborts the upstream Ollama generation. Chat messages are stored in the local `chat_messages` PostgreSQL table (migration 002). Chat history in real mode no longer uses mock responses.
+
+### Endpoint validation and cancellation guarantees
+
+- `content`: trimmed, 1–12,000 characters; `model`: trimmed, 1–200 characters and exactly matches an installed name. Arbitrary endpoint properties and other unknown fields are rejected.
+- `conversationId`: 1–64 ASCII letters, digits, `_` or `-`; defaults to `default`. History `limit` is 1–100 (default 50); `before` is a positive safe integer sequence cursor. Pages are oldest-to-newest; use `nextBefore` to retrieve older records.
+- The runtime reserves a conversation **before model discovery or database preparation**. Another stream for it returns 409 `conversation_busy`. Different conversations are independent. The lock is process-local: run one runtime process per local profile.
+- Cancellation via authenticated `POST /v1/chat/cancel` or closing the streaming HTTP connection aborts the upstream request. 202 acknowledges a cancellation request, not durable completion; fetch history after stream termination to read `aborted`/`failed` status. Normal response closure does not cancel completed work.
+- Discovery has a 2.5-second timeout; generation has 60-second idle and 300-second total timeouts. NDJSON lines and accumulated answers are limited to 1,000,000 characters. Upstream redirects are refused, and upstream error bodies are not exposed through chat errors.
+- Empty model discovery returns 200 `{models:[]}`, not fabricated model names. Health reports the reachable Ollama daemon as `up` but `degraded:true` with zero models. Discovery proves daemon/model-list availability, **not successful real-model inference**. Missing configuration remains `unknown` and degraded; a failed configured probe is `down` independently of PostgreSQL.
+- Model discovery remains available without chat storage. Unconfigured endpoints return explicit 503 `ollama_not_configured` or `chat_not_configured`, and database failures never fall back to simulated history.
 
 ## Domain permissions and human approval drafts
 

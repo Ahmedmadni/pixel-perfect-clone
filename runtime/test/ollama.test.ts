@@ -54,4 +54,34 @@ describe("Ollama local client", () => {
     })()).rejects.toBeInstanceOf(OllamaError);
     expect(chunks).toHaveLength(0);
   });
+  it("does not send requests for an already cancelled stream", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("Cancelled"));
+    const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      init?.signal?.throwIfAborted();
+      return new Response('{"done":true}\n');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect((async () => {
+      for await (const _delta of new OllamaClient("http://127.0.0.1:11434").chatStream("installed", [], controller.signal)) { /* none */ }
+    })()).rejects.toThrow("Cancelled");
+    expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+  });
+  it("rejects oversized complete NDJSON lines", async () => {
+    async function* body() { yield new TextEncoder().encode(JSON.stringify({ content: "x".repeat(1_000_001) }) + "\n"); }
+    await expect((async () => {
+      for await (const _value of parseNdjson(body())) { /* none */ }
+    })()).rejects.toMatchObject({ kind: "bad_response" });
+  });
+  it("blocks redirects for both discovery and inference", async () => {
+    const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      if (init?.method === "POST") return new Response('{"done":true}\n');
+      return new Response('{"models":[]}');
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new OllamaClient("http://127.0.0.1:11434");
+    await client.listModels();
+    for await (const _delta of client.chatStream("installed", [], new AbortController().signal)) { /* none */ }
+    expect(fetchMock.mock.calls.map((call) => call[1]?.redirect)).toEqual(["error", "error"]);
+  });
 });
