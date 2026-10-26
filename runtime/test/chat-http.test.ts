@@ -65,9 +65,7 @@ async function fixture(options: { empty?: boolean; holdTags?: boolean; holdChat?
   const releaseTags = deferred<void>();
   const chatEntered = deferred<void>();
   const chatClosed = deferred<void>();
-  const clientSocketClosed = deferred<void>();
   const server = createServer(async (req, res) => {
-    if (req.url === "/v1/chat/stream") req.socket.once("close", () => clientSocketClosed.resolve());
     if (req.url === "/api/tags") {
       tagsEntered.resolve();
       if (options.holdTags) await releaseTags.promise;
@@ -86,7 +84,7 @@ async function fixture(options: { empty?: boolean; holdTags?: boolean; holdChat?
     if (!options.holdChat) res.end('{"done":true}\n');
   });
   const url = await bind(server);
-  return { url, server, tagsEntered, releaseTags, chatEntered, chatClosed, clientSocketClosed };
+  return { url, server, tagsEntered, releaseTags, chatEntered, chatClosed };
 }
 function stream(app: FastifyInstance, conversationId = "default") {
   return app.inject({ method: "POST", url: "/v1/chat/stream", headers, payload: { ...payload, conversationId } });
@@ -151,6 +149,8 @@ describe("Ollama HTTP endpoints and exclusive cancellable chat", () => {
     const f = await fixture({ holdTags: true });
     const h = history();
     const app = await runtime(new OllamaClient(f.url), h.chat);
+    const clientSocketClosed = deferred<void>();
+    app.server.once("connection", (socket) => socket.once("close", () => clientSocketClosed.resolve()));
     const url = await app.listen({ port: 0, host: "127.0.0.1" });
     const client = httpRequest(url + "/v1/chat/stream", {
       method: "POST",
