@@ -170,3 +170,11 @@ PostgreSQL، ومنع تسليم التحكم للوكيل دون بدء مهم�
 - اكتملت **9/9** مهام CI بنجاح: اختبارات Runtime وTypeScript، واختبارات إعداد Windows، والنسخ الاحتياطي المشفر والاستعادة، واختبارات وبناء الواجهة العربية، واختبار DPAPI، وصياغة PowerShell وDocker Compose، وتكامل PostgreSQL، وفحوص PowerShell على عامل Windows مستضاف، وسياسات Chromium.
 - إصلاح الاختبار في `runtime/test/chat-http.test.ts` جعل الاختبار ينتظر `clientSocketClosed.promise` المعرّف داخل الاختبار بدل مرجع غير موجود، ثم نجح تشغيل CI على نفس الـ commit.
 - هذه النتيجة تثبت نجاح فحوص CI لهذا الـ commit فقط. لا تثبت تشغيل المشروع على جهاز Windows الشخصي، أو inference باستخدام نموذج Ollama محلي حقيقي، أو قبول W0–W5؛ تظل بوابات القبول المحلية غير منفذة حتى تسجيل دليل فعلي من الجهاز.
+
+
+### تحديث تحقق السحابة — 26 أكتوبر 2026
+
+- آخر تشغيل على `main`: [Verify Cloud Development #319](https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/40273358885)، على commit `71465b3d39cfdf15e3c7f7521ae7907d6c920229`.
+- نتيجة التشغيل: `success`، واكتملت المهام التسع بنجاح؛ شملت بناء الواجهة واختباراتها، TypeScript، runtime، تكامل PostgreSQL، وفحوص Windows وChromium والنسخ الاحتياطي.
+- هذا التشغيل يؤكد نتيجة CI لهذا الـ commit فقط. لا يثبت تشغيل Docker Desktop أو Chromium الفعلي أو Ollama بنموذج محلي على جهاز المالك.
+- تظل بوابات القبول المحلية W0–W5 بحالة `NOT TESTED` حتى تنفيذها على جهاز Windows وتسجيل أدلة منقحة. الخطوة العملية التالية هي `scripts/windows/launch.ps1` لأول إعداد نظيف، أو `scripts/windows/preflight.ps1` إذا كانت الإعدادات المحلية موجودة بالفعل. لا تشارك ملفات الأسرار ولا تعطّل Chromium sandbox.
