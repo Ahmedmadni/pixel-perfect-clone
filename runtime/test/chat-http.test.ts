@@ -65,7 +65,9 @@ async function fixture(options: { empty?: boolean; holdTags?: boolean; holdChat?
   const releaseTags = deferred<void>();
   const chatEntered = deferred<void>();
   const chatClosed = deferred<void>();
+  const clientSocketClosed = deferred<void>();
   const server = createServer(async (req, res) => {
+    if (req.url === "/v1/chat/stream") req.socket.once("close", () => clientSocketClosed.resolve());
     if (req.url === "/api/tags") {
       tagsEntered.resolve();
       if (options.holdTags) await releaseTags.promise;
@@ -84,7 +86,7 @@ async function fixture(options: { empty?: boolean; holdTags?: boolean; holdChat?
     if (!options.holdChat) res.end('{"done":true}\n');
   });
   const url = await bind(server);
-  return { url, server, tagsEntered, releaseTags, chatEntered, chatClosed };
+  return { url, server, tagsEntered, releaseTags, chatEntered, chatClosed, clientSocketClosed };
 }
 function stream(app: FastifyInstance, conversationId = "default") {
   return app.inject({ method: "POST", url: "/v1/chat/stream", headers, payload: { ...payload, conversationId } });
@@ -158,6 +160,7 @@ describe("Ollama HTTP endpoints and exclusive cancellable chat", () => {
     client.end(JSON.stringify(payload));
     await f.tagsEntered.promise;
     client.destroy();
+    await f.clientSocketClosed.promise;
     f.releaseTags.resolve();
 
     // The abandoned request must not persist a user/assistant message or leave
