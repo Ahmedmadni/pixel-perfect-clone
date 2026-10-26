@@ -160,7 +160,7 @@ describe("Ollama HTTP endpoints and exclusive cancellable chat", () => {
     client.end(JSON.stringify(payload));
     await f.tagsEntered.promise;
     client.destroy();
-    await f.clientSocketClosed.promise;
+    await clientSocketClosed.promise;
     f.releaseTags.resolve();
 
     // The abandoned request must not persist a user/assistant message or leave
