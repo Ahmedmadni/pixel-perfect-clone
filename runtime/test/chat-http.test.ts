@@ -57,7 +57,10 @@ async function bind(server: Server) {
 }
 async function runtime(ollama?: OllamaClient, chat?: ChatStore, store = control) {
   const app = await buildApp(cfg, store, { ollama, chat });
-  cleanups.push(() => app.close());
+  cleanups.push(async () => {
+    app.server.closeAllConnections();
+    await app.close();
+  });
   return app;
 }
 async function fixture(options: { empty?: boolean; holdTags?: boolean; holdChat?: boolean; badChat?: boolean } = {}) {
