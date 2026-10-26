@@ -162,3 +162,11 @@ PostgreSQL، ومنع تسليم التحكم للوكيل دون بدء مهم�
 - نجح تشغيل التوثيق السابق على commit `58a48e2e0cd9105d6be3f93841176336021f02e1`: [تشغيل Verify Cloud Development #311](https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/40271375714).
 
 **حدود الاعتماد:** هذه نتيجة ناجحة على عامل Windows مستضاف، وليست اختبارًا على جهاز المستخدم. لا تثبت تشغيل Docker Desktop محليًا، أو جلسة Chromium حقيقية، أو Ollama مع نموذج محلي، أو استعادة جلسة مستخدم فعلية. تظل هذه نقاط قبول يدوية قبل إعلان الجاهزية النهائية.
+
+
+### متابعة العمل على GitHub — 26 أكتوبر 2026 (تحديث بعد الإصلاح)
+
+- نجح تشغيل GitHub Actions رقم **40273156955** على commit **64f7a85a9f94b65ed1ae44c8cd511a8db678fcfb**: https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/40273156955
+- اكتملت **9/9** مهام CI بنجاح: اختبارات Runtime وTypeScript، واختبارات إعداد Windows، والنسخ الاحتياطي المشفر والاستعادة، واختبارات وبناء الواجهة العربية، واختبار DPAPI، وصياغة PowerShell وDocker Compose، وتكامل PostgreSQL، وفحوص PowerShell على عامل Windows مستضاف، وسياسات Chromium.
+- إصلاح الاختبار في `runtime/test/chat-http.test.ts` جعل الاختبار ينتظر `clientSocketClosed.promise` المعرّف داخل الاختبار بدل مرجع غير موجود، ثم نجح تشغيل CI على نفس الـ commit.
+- هذه النتيجة تثبت نجاح فحوص CI لهذا الـ commit فقط. لا تثبت تشغيل المشروع على جهاز Windows الشخصي، أو inference باستخدام نموذج Ollama محلي حقيقي، أو قبول W0–W5؛ تظل بوابات القبول المحلية غير منفذة حتى تسجيل دليل فعلي من الجهاز.
