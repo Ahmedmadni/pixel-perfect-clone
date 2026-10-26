@@ -145,6 +145,33 @@ describe("Ollama HTTP endpoints and exclusive cancellable chat", () => {
     expect((await first).statusCode).toBe(200);
     expect((await stream(app)).statusCode).toBe(200);
   });
+  it("releases the conversation lock when the client disconnects during model discovery", async () => {
+    const f = await fixture({ holdTags: true });
+    const h = history();
+    const app = await runtime(new OllamaClient(f.url), h.chat);
+    const url = await app.listen({ port: 0, host: "127.0.0.1" });
+    const client = httpRequest(url + "/v1/chat/stream", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
+    client.on("error", () => {});
+    client.end(JSON.stringify(payload));
+    await f.tagsEntered.promise;
+    client.destroy();
+    f.releaseTags.resolve();
+
+    // The abandoned request must not persist a user/assistant message or leave
+    // the conversation permanently busy while model discovery is unwinding.
+    let response: Awaited<ReturnType<typeof stream>> | undefined;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      response = await stream(app);
+      if (response.statusCode !== 409) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(response?.statusCode).toBe(200);
+    expect(h.messages).toHaveLength(2);
+    expect(h.messages[1]?.status).toBe("complete");
+  });
   it("cancels upstream generation, stores aborted partial text and releases the lock", async () => {
     const f = await fixture({ holdChat: true });
     const h = history();
