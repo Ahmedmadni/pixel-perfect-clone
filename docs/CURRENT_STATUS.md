@@ -154,3 +154,11 @@ PostgreSQL، ومنع تسليم التحكم للوكيل دون بدء مهم�
 3. توثيق نتيجة حفظ جلسة Chromium واستعادتها على Windows، مع إبقاء أي اختبار على حسابات حقيقية خارج نطاق CI.
 4. لا دمج إضافي أو إعلان جاهزية إنتاجية اعتمادًا على اختبارات Ubuntu وحدها. لم يتم من هذه المراجعة تشغيل جهاز Windows الخاص بالمستخدم أو نموذج Ollama محلي حقيقي.
 
+### نتائج التحقق بعد إضافة Windows runner — 26 أكتوبر 2026
+
+- نجح GitHub Actions على commit `c282e48134f287a0b50ac4b18a19f7c8d6b6edaa`: [تشغيل Verify Cloud Development #312](https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/40271398567).
+- مهمة `Native Windows PowerShell safety checks` نجحت، بما يشمل تحليل السكربتات وتشغيل اختبارات preflight والتشخيص المعزولة على `windows-latest`.
+- نجحت أيضًا مهام الواجهة والبناء، واختبارات runtime، وتكامل PostgreSQL، وسياسات Chromium، واختبارات النسخ الاحتياطي المشفر والاستعادة.
+- نجح تشغيل التوثيق السابق على commit `58a48e2e0cd9105d6be3f93841176336021f02e1`: [تشغيل Verify Cloud Development #311](https://github.com/Ahmedmadni/pixel-perfect-clone/actions/runs/40271375714).
+
+**حدود الاعتماد:** هذه نتيجة ناجحة على عامل Windows مستضاف، وليست اختبارًا على جهاز المستخدم. لا تثبت تشغيل Docker Desktop محليًا، أو جلسة Chromium حقيقية، أو Ollama مع نموذج محلي، أو استعادة جلسة مستخدم فعلية. تظل هذه نقاط قبول يدوية قبل إعلان الجاهزية النهائية.
