@@ -87,6 +87,7 @@ export function registerChatRoutes(app: FastifyInstance, ollama?: OllamaClient, 
     const clientSocket = request.raw.socket;
     reply.raw.once("close", onClose);
     clientSocket.once("close", onClose);
+    request.raw.once("aborted", onClose);
     try {
       // Reserve before discovery: concurrent requests cannot both pass preparation.
       let models;
@@ -147,6 +148,7 @@ export function registerChatRoutes(app: FastifyInstance, ollama?: OllamaClient, 
     } finally {
       reply.raw.removeListener("close", onClose);
       clientSocket.removeListener("close", onClose);
+      request.raw.removeListener("aborted", onClose);
       // If a failure happened before attaching the stream, the error handler responds normally.
       if (assistantId && !completed && !reply.sent) {
         await chat.finishAssistant(assistantId, answer, controller.signal.aborted ? "aborted" : "failed", "Interrupted before streaming")
