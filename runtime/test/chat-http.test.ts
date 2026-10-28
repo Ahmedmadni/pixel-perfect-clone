@@ -214,7 +214,9 @@ describe("Ollama HTTP endpoints and exclusive cancellable chat", () => {
     await firstChunk.promise;
     await f.chatEntered.promise;
     client.destroy();
-    await f.chatClosed.promise;
+    // Do not wait for the upstream TCP close: Node fetch may keep the pooled
+    // connection alive after AbortSignal cancellation. The persisted aborted
+    // status below is the deterministic contract we need to verify.
     await new Promise<void>((resolve, reject) => {
       let attempts = 0;
       const poll = () => h.messages[1]?.status === "aborted" ? resolve() : ++attempts > 100 ? reject(new Error("Not aborted")) : setTimeout(poll, 10);
